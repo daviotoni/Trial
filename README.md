@@ -55,9 +55,16 @@ orgao/
   modelos.py      # as classes de domínio (dataclasses, sem dependências)
   visualizar.py   # impressão da árvore e ficha do órgão
   exemplo.py      # monta uma Secretaria de Educação fictícia
-  cmdc.py         # estrutura REAL da Câmara Municipal de Duque de Caxias (Lei 3.525/2025)
+  cmdc.py         # estrutura REAL da CMDC (Lei 3.525/2025) + Anexo I completo
+sistema/
+  schema.sql      # banco do sistema de gestão (SQL portável: SQLite/PostgreSQL)
+  gerar_seed.py   # carga inicial gerada a partir de orgao/cmdc.py
+  seed.sql        # seed gerado (unidades, símbolos, cargos, rubricas)
+  demo.py         # cria o banco e roda consultas de verificação
 docs/
-  pesquisa-estrutura-cmdc.md  # relatório de pesquisa com fontes verificadas
+  pesquisa-estrutura-cmdc.md      # relatório de pesquisa com fontes verificadas
+  modelo-de-dados.md              # desenho do banco: módulos, entidades, regras
+  lei-3525-2025-texto-integral.txt
 main.py           # ponto de entrada
 tests/            # testes com unittest
 ```
@@ -75,6 +82,21 @@ python -m orgao.cmdc    # imprime a ficha e o organograma da CMDC
 O estudo completo — lei, organograma, regime de pessoal (Lei 1.506/2000),
 gratificações e o mapa setores → módulos para um futuro sistema de gestão —
 está em [`docs/pesquisa-estrutura-cmdc.md`](docs/pesquisa-estrutura-cmdc.md).
+
+## Sistema de gestão (protótipo do banco)
+
+O diretório `sistema/` contém o modelo de dados do sistema que atenderá todos
+os setores da Casa (7 módulos: estrutura, pessoal, folha, protocolo,
+legislativo, compras e controle/transparência), documentado em
+[`docs/modelo-de-dados.md`](docs/modelo-de-dados.md):
+
+```bash
+python -m sistema.demo      # cria o banco (SQLite) com schema + seed e verifica
+python -m sistema.gerar_seed > sistema/seed.sql   # regenera a carga inicial
+```
+
+A carga inicial é derivada de `orgao/cmdc.py` — as 49 unidades e as 615 vagas
+do Anexo I da Lei 3.525/2025 entram no banco sem digitação manual.
 
 > Os números de leis/decretos no exemplo são ilustrativos, apenas para fins de
 > estudo da estrutura.
