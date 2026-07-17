@@ -93,7 +93,18 @@ legislativo, compras e controle/transparência), documentado em
 ```bash
 python -m sistema.demo      # cria o banco (SQLite) com schema + seed e verifica
 python -m sistema.cenario   # estudo de caso: nomeações, tramitação e folha
+python -m sistema.api       # API REST em http://127.0.0.1:8000 (banco cmdc.db)
 python -m sistema.gerar_seed > sistema/seed.sql   # regenera a carga inicial
+```
+
+A API (`sistema/api.py`, biblioteca padrão, sem dependências) expõe
+organograma, unidades, cargos com vagas disponíveis, servidores, nomeações,
+processos/tramitações e cálculo de folha. Violações de regra legal retornam
+HTTP 422 com a mensagem e o artigo:
+
+```bash
+curl -X POST localhost:8000/folhas -d '{"competencia":"2025-09","percentual_gal":200}'
+# {"erro": "GAL acima do teto de 150% (art. 7º)"}
 ```
 
 `sistema/servicos.py` implementa as regras de negócio: nomeações que respeitam

@@ -15,9 +15,14 @@ from sistema.gerar_seed import gerar
 RAIZ = Path(__file__).parent
 
 
-def criar_banco(caminho: str = ":memory:") -> sqlite3.Connection:
-    """Cria o banco com schema + seed e devolve a conexão."""
-    conexao = sqlite3.connect(caminho)
+def criar_banco(caminho: str = ":memory:",
+                multithread: bool = False) -> sqlite3.Connection:
+    """Cria o banco com schema + seed e devolve a conexão.
+
+    Com multithread=True a conexão pode ser usada por várias threads —
+    o chamador deve serializar os acessos (a API usa um lock).
+    """
+    conexao = sqlite3.connect(caminho, check_same_thread=not multithread)
     conexao.execute("PRAGMA foreign_keys = ON")
     conexao.executescript((RAIZ / "schema.sql").read_text())
     conexao.executescript(gerar())
