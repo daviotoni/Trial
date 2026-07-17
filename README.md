@@ -54,10 +54,27 @@ print(orgao.total_unidades())   # 2
 orgao/
   modelos.py      # as classes de domínio (dataclasses, sem dependências)
   visualizar.py   # impressão da árvore e ficha do órgão
-  exemplo.py      # monta uma Secretaria de Educação completa
+  exemplo.py      # monta uma Secretaria de Educação fictícia
+  cmdc.py         # estrutura REAL da Câmara Municipal de Duque de Caxias (Lei 3.525/2025)
+docs/
+  pesquisa-estrutura-cmdc.md  # relatório de pesquisa com fontes verificadas
 main.py           # ponto de entrada
 tests/            # testes com unittest
 ```
+
+## Caso real: Câmara Municipal de Duque de Caxias (CMDC)
+
+`orgao/cmdc.py` modela a estrutura administrativa vigente da CMDC conforme a
+**Lei nº 3.525/2025**, organizada em quatro graus funcionais (órgãos superiores,
+coordenadorias, assessoramento parlamentar e serviços auxiliares):
+
+```bash
+python -m orgao.cmdc    # imprime a ficha e o organograma da CMDC
+```
+
+O estudo completo — lei, organograma, regime de pessoal (Lei 1.506/2000),
+gratificações e o mapa setores → módulos para um futuro sistema de gestão —
+está em [`docs/pesquisa-estrutura-cmdc.md`](docs/pesquisa-estrutura-cmdc.md).
 
 > Os números de leis/decretos no exemplo são ilustrativos, apenas para fins de
 > estudo da estrutura.
