@@ -14,6 +14,14 @@ Expõe a camada de serviços (`sistema.servicos`) por HTTP/JSON:
     POST /processos/{id}/tramitacoes      tramitar
     POST /folhas                          calcula folha da competência
     GET  /folhas/{id}                     itens da folha calculada
+    POST /legislaturas                    abre legislatura
+    GET  /parlamentares                   lista parlamentares
+    POST /parlamentares                   empossa parlamentar (mandato)
+    POST /proposicoes                     protocola proposição (nº por tipo/ano)
+    POST /sessoes                         convoca sessão
+    POST /sessoes/{id}/pauta              inclui proposição na ordem do dia
+    POST /sessoes/{id}/votacoes           vota (nominal ou simbólica)
+    GET  /sessoes/{id}/votacoes/{prop}    placar da votação
 
 Regras violadas retornam 422 com a mensagem legal; recurso ausente, 404.
 
@@ -29,7 +37,7 @@ import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from sistema import servicos
+from sistema import legislativo, servicos
 from sistema.demo import criar_banco
 from sistema.servicos import RegraViolada
 
@@ -187,6 +195,69 @@ class Aplicacao:
         self.banco.commit()
         return {"id": folha_id, "total": servicos.total_folha(self.banco, folha_id)}
 
+    # ------------------------ legislativo --------------------------
+
+    def parlamentares(self):
+        return [
+            {"id": pid, "nome": nome, "partido": partido}
+            for pid, nome, partido in self.banco.execute(
+                "SELECT id, nome, partido FROM parlamentar ORDER BY nome"
+            )
+        ]
+
+    def empossar(self, dados):
+        parlamentar_id = legislativo.empossar(
+            self.banco, dados["nome"], dados.get("partido"),
+            dados["legislatura_id"], dados.get("gabinete_unidade_id"),
+        )
+        self.banco.commit()
+        return {"id": parlamentar_id}
+
+    def criar_legislatura(self, dados):
+        legislatura_id = legislativo.criar_legislatura(
+            self.banco, dados["numero"], dados["inicio"], dados["fim"],
+        )
+        self.banco.commit()
+        return {"id": legislatura_id}
+
+    def apresentar_proposicao(self, dados):
+        proposicao_id, rotulo = legislativo.apresentar_proposicao(
+            self.banco, dados["tipo"], dados["ementa"], dados["data"],
+            dados.get("autor_parlamentar_id"),
+            dados.get("unidade_protocolo_id"),
+        )
+        self.banco.commit()
+        return {"id": proposicao_id, "rotulo": rotulo}
+
+    def convocar_sessao(self, dados):
+        sessao_id, numero = legislativo.convocar_sessao(
+            self.banco, dados["tipo"], dados["data"],
+        )
+        self.banco.commit()
+        return {"id": sessao_id, "numero": numero}
+
+    def pautar(self, sessao_id: int, dados):
+        item = legislativo.pautar(self.banco, sessao_id, dados["proposicao_id"])
+        self.banco.commit()
+        return {"id": item}
+
+    def votar(self, sessao_id: int, dados):
+        votos = dados.get("votos")
+        if votos:
+            votos = {int(pid): valor for pid, valor in votos.items()}
+        resultado = legislativo.votar(
+            self.banco, sessao_id, dados["proposicao_id"],
+            dados["modalidade"], votos, dados.get("resultado_simbolico"),
+        )
+        self.banco.commit()
+        return {"resultado": resultado}
+
+    def placar(self, sessao_id: int, proposicao_id: int):
+        try:
+            return legislativo.placar(self.banco, sessao_id, proposicao_id)
+        except RegraViolada:
+            raise Recurso404
+
 
 ROTAS = [
     ("GET", r"^/organograma$", lambda app, m, d: app.organograma()),
@@ -204,6 +275,17 @@ ROTAS = [
      lambda app, m, d: app.tramitar(int(m.group(1)), d)),
     ("POST", r"^/folhas$", lambda app, m, d: app.calcular_folha(d)),
     ("GET", r"^/folhas/(\d+)$", lambda app, m, d: app.folha(int(m.group(1)))),
+    ("GET", r"^/parlamentares$", lambda app, m, d: app.parlamentares()),
+    ("POST", r"^/parlamentares$", lambda app, m, d: app.empossar(d)),
+    ("POST", r"^/legislaturas$", lambda app, m, d: app.criar_legislatura(d)),
+    ("POST", r"^/proposicoes$", lambda app, m, d: app.apresentar_proposicao(d)),
+    ("POST", r"^/sessoes$", lambda app, m, d: app.convocar_sessao(d)),
+    ("POST", r"^/sessoes/(\d+)/pauta$",
+     lambda app, m, d: app.pautar(int(m.group(1)), d)),
+    ("POST", r"^/sessoes/(\d+)/votacoes$",
+     lambda app, m, d: app.votar(int(m.group(1)), d)),
+    ("GET", r"^/sessoes/(\d+)/votacoes/(\d+)$",
+     lambda app, m, d: app.placar(int(m.group(1)), int(m.group(2)))),
 ]
 
 

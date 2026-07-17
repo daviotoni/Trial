@@ -113,6 +113,12 @@ art. 5º, §3º), protocolo com numeração sequencial, tramitação encadeada e
 cálculo de folha com as gratificações da lei (GAL com teto de 150%, GRAT-CC de
 100% para efetivo em comissão, GRAT-COM de 40%, REP-TL, GAP, REP-JUD).
 
+`sistema/legislativo.py` cobre a atividade-fim: proposições numeradas por
+tipo/ano com autuação automática no protocolo, sessões, ordem do dia e
+votações **nominais** (voto individual, apuração por maioria simples) ou
+simbólicas — com bloqueios para matéria fora de pauta ou já votada.
+Demonstração: `python -m sistema.legislativo`.
+
 A carga inicial é derivada de `orgao/cmdc.py` — as 49 unidades e as 615 vagas
 do Anexo I da Lei 3.525/2025 entram no banco sem digitação manual.
 

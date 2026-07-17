@@ -131,6 +131,48 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(codigo, 400)
         self.assertIn("vinculo", erro["erro"])
 
+    def test_fluxo_legislativo(self):
+        _, legislatura = requisitar(self.base, "POST", "/legislaturas", {
+            "numero": 9, "inicio": "2025-01-01", "fim": "2028-12-31"})
+        ids = [
+            requisitar(self.base, "POST", "/parlamentares", {
+                "nome": f"Vereador API {i}", "partido": "PXX",
+                "legislatura_id": legislatura["id"]})[1]["id"]
+            for i in range(3)
+        ]
+        _, proposicao = requisitar(self.base, "POST", "/proposicoes", {
+            "tipo": "PR", "ementa": "Altera o Regimento",
+            "data": "2025-10-01", "autor_parlamentar_id": ids[0]})
+        self.assertEqual(proposicao["rotulo"], "PR 1/2025")
+
+        _, sessao = requisitar(self.base, "POST", "/sessoes", {
+            "tipo": "EXTRAORDINARIA", "data": "2025-10-05"})
+        codigo, _ = requisitar(self.base, "POST",
+                               f"/sessoes/{sessao['id']}/pauta",
+                               {"proposicao_id": proposicao["id"]})
+        self.assertEqual(codigo, 200)
+
+        codigo, votacao = requisitar(
+            self.base, "POST", f"/sessoes/{sessao['id']}/votacoes",
+            {"proposicao_id": proposicao["id"], "modalidade": "NOMINAL",
+             "votos": {str(ids[0]): "SIM", str(ids[1]): "SIM",
+                       str(ids[2]): "NAO"}})
+        self.assertEqual(codigo, 200)
+        self.assertEqual(votacao["resultado"], "APROVADA")
+
+        codigo, placar = requisitar(
+            self.base, "GET",
+            f"/sessoes/{sessao['id']}/votacoes/{proposicao['id']}")
+        self.assertEqual(codigo, 200)
+        self.assertEqual(placar["contagem"]["SIM"], 2)
+
+        # Votar de novo a mesma matéria na mesma sessão → 422.
+        codigo, _ = requisitar(
+            self.base, "POST", f"/sessoes/{sessao['id']}/votacoes",
+            {"proposicao_id": proposicao["id"], "modalidade": "SIMBOLICA",
+             "resultado_simbolico": "APROVADA"})
+        self.assertEqual(codigo, 422)
+
 
 if __name__ == "__main__":
     unittest.main()
