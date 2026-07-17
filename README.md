@@ -99,7 +99,11 @@ python -m sistema.gerar_seed > sistema/seed.sql   # regenera a carga inicial
 
 A API (`sistema/api.py`, biblioteca padrão, sem dependências) expõe
 organograma, unidades, cargos com vagas disponíveis, servidores, nomeações,
-processos/tramitações e cálculo de folha. Violações de regra legal retornam
+processos/tramitações, plenário e cálculo de folha — e serve em `/` a
+**interface web** (`sistema/web/index.html`, HTML/JS puro): organograma
+navegável, quadro do Anexo I com filtro, autuação/consulta/tramitação de
+processos e placar de votações nominais. Basta abrir
+`http://127.0.0.1:8000` com a API no ar. Violações de regra legal retornam
 HTTP 422 com a mensagem e o artigo:
 
 ```bash

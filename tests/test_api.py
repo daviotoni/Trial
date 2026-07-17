@@ -36,6 +36,14 @@ class TestAPI(unittest.TestCase):
         cls.servidor.shutdown()
         cls.servidor.server_close()
 
+    def test_pagina_web(self):
+        with urllib.request.urlopen(self.base + "/") as resposta:
+            self.assertEqual(resposta.status, 200)
+            self.assertIn("text/html", resposta.headers["Content-Type"])
+            corpo = resposta.read().decode("utf-8")
+        self.assertIn("Sistema de Gestão — Câmara Municipal de Duque de Caxias",
+                      corpo)
+
     def test_organograma(self):
         codigo, corpo = requisitar(self.base, "GET", "/organograma")
         self.assertEqual(codigo, 200)

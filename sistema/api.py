@@ -36,6 +36,9 @@ import json
 import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+PAGINA_WEB = Path(__file__).parent / "web" / "index.html"
 
 from sistema import legislativo, servicos
 from sistema.demo import criar_banco
@@ -329,6 +332,14 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:"):
             self._responder(404, {"erro": "rota inexistente"})
 
         def do_GET(self):
+            if self.path in ("/", "/index.html"):
+                conteudo = PAGINA_WEB.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(conteudo)))
+                self.end_headers()
+                self.wfile.write(conteudo)
+                return
             self._despachar("GET")
 
         def do_POST(self):

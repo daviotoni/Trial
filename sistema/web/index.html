@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema CMDC — Protótipo</title>
+<style>
+  :root {
+    --azul: #1a3a5c; --azul-claro: #2c5f8a; --fundo: #f4f6f8;
+    --borda: #d8dee4; --texto: #24313d; --ok: #1e7d43; --erro: #b02a2a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif;
+         background: var(--fundo); color: var(--texto); }
+  header { background: var(--azul); color: #fff; padding: 14px 22px; }
+  header h1 { margin: 0; font-size: 19px; font-weight: 600; }
+  header small { opacity: .75; }
+  nav { display: flex; gap: 4px; background: var(--azul-claro);
+        padding: 0 14px; flex-wrap: wrap; }
+  nav button { background: none; border: none; color: #fff; padding: 10px 14px;
+               cursor: pointer; font-size: 14px; border-bottom: 3px solid transparent; }
+  nav button.ativa { border-bottom-color: #fff; font-weight: 600; }
+  main { max-width: 1060px; margin: 20px auto; padding: 0 16px; }
+  section { display: none; }
+  section.ativa { display: block; }
+  .cartao { background: #fff; border: 1px solid var(--borda); border-radius: 8px;
+            padding: 16px 18px; margin-bottom: 16px; }
+  h2 { margin: 0 0 10px; font-size: 16px; color: var(--azul); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--borda); }
+  th { color: var(--azul); }
+  ul.arvore, ul.arvore ul { list-style: none; padding-left: 20px; margin: 4px 0; }
+  ul.arvore { padding-left: 0; }
+  .no { cursor: pointer; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+  .no:hover { background: #eaf1f7; }
+  .no .sigla { color: #667; font-size: 12px; }
+  .grau { font-size: 11px; background: #e4ecf3; color: var(--azul);
+          border-radius: 10px; padding: 1px 8px; margin-left: 6px; }
+  input, select, textarea { padding: 7px 9px; border: 1px solid var(--borda);
+          border-radius: 6px; font: inherit; width: 100%; margin: 3px 0 10px; }
+  button.acao { background: var(--azul); color: #fff; border: none;
+                padding: 9px 18px; border-radius: 6px; cursor: pointer; font: inherit; }
+  button.acao:hover { background: var(--azul-claro); }
+  .linha { display: flex; gap: 14px; flex-wrap: wrap; }
+  .linha > div { flex: 1; min-width: 240px; }
+  .msg { padding: 9px 12px; border-radius: 6px; margin: 8px 0; display: none; }
+  .msg.ok { display: block; background: #e6f4ea; color: var(--ok); }
+  .msg.erro { display: block; background: #fbeaea; color: var(--erro); }
+  .placar { display: flex; gap: 18px; font-size: 20px; font-weight: 700; margin: 8px 0; }
+  .placar .sim { color: var(--ok); } .placar .nao { color: var(--erro); }
+  .selo { font-size: 12px; border-radius: 10px; padding: 2px 9px; }
+  .selo.APROVADA { background: #e6f4ea; color: var(--ok); }
+  .selo.REJEITADA { background: #fbeaea; color: var(--erro); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sistema de Gestão — Câmara Municipal de Duque de Caxias</h1>
+  <small>Protótipo · Lei nº 3.525/2025 · dados de demonstração</small>
+</header>
+<nav id="menu">
+  <button data-aba="organograma" class="ativa">Organograma</button>
+  <button data-aba="cargos">Cargos e vagas</button>
+  <button data-aba="protocolo">Protocolo</button>
+  <button data-aba="plenario">Plenário</button>
+</nav>
+<main>
+
+<section id="organograma" class="ativa">
+  <div class="cartao">
+    <h2>Estrutura organizacional (Lei nº 3.525/2025)</h2>
+    <p>Clique numa unidade para recolher/expandir. Graus: 1 — órgãos
+    superiores; 2 — coordenadorias; 3 — assessoramento parlamentar;
+    4 — serviços auxiliares.</p>
+    <div id="arvore"></div>
+  </div>
+</section>
+
+<section id="cargos">
+  <div class="cartao">
+    <h2>Anexo I — cargos comissionados e funções gratificadas</h2>
+    <input id="filtro-cargo" placeholder="Filtrar por denominação ou símbolo…">
+    <table id="tabela-cargos">
+      <thead><tr><th>Denominação</th><th>Símbolo</th><th>Tipo</th>
+        <th>Vagas</th><th>Disponíveis</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="protocolo">
+  <div class="linha">
+    <div class="cartao">
+      <h2>Autuar processo</h2>
+      <label>Tipo</label>
+      <select id="proc-tipo">
+        <option>ADMINISTRATIVO</option><option>LEGISLATIVO</option>
+      </select>
+      <label>Assunto</label>
+      <input id="proc-assunto" placeholder="Ex.: Aquisição de material de expediente">
+      <label>Unidade de origem</label>
+      <select id="proc-unidade"></select>
+      <label>Data de autuação</label>
+      <input id="proc-data" type="date">
+      <button class="acao" id="btn-autuar">Autuar</button>
+      <div class="msg" id="msg-autuar"></div>
+    </div>
+    <div class="cartao">
+      <h2>Consultar / tramitar</h2>
+      <label>Nº interno do processo</label>
+      <input id="consulta-id" type="number" min="1" placeholder="id devolvido na autuação">
+      <button class="acao" id="btn-consultar">Consultar</button>
+      <div class="msg" id="msg-consulta"></div>
+      <div id="detalhe-processo"></div>
+      <div id="form-tramitar" style="display:none">
+        <label>Tramitar para</label>
+        <select id="tram-destino"></select>
+        <label>Despacho</label>
+        <input id="tram-despacho" placeholder="Ex.: Para análise e parecer">
+        <button class="acao" id="btn-tramitar">Tramitar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="plenario">
+  <div class="cartao">
+    <h2>Consultar placar de votação</h2>
+    <div class="linha">
+      <div><label>Nº da sessão (id)</label><input id="placar-sessao" type="number" min="1"></div>
+      <div><label>Nº da proposição (id)</label><input id="placar-prop" type="number" min="1"></div>
+    </div>
+    <button class="acao" id="btn-placar">Ver placar</button>
+    <div class="msg" id="msg-placar"></div>
+    <div id="painel-placar"></div>
+  </div>
+  <div class="cartao">
+    <h2>Parlamentares</h2>
+    <table id="tabela-parlamentares">
+      <thead><tr><th>Nome</th><th>Partido</th></tr></thead><tbody></tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+<script>
+const consultar = async (caminho, opcoes) => {
+  const resposta = await fetch(caminho, opcoes);
+  const corpo = await resposta.json();
+  if (!resposta.ok) throw new Error(corpo.erro || resposta.status);
+  return corpo;
+};
+const enviar = (caminho, dados) => consultar(caminho, {
+  method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify(dados),
+});
+const mostrar = (id, texto, tipo) => {
+  const alvo = document.getElementById(id);
+  alvo.textContent = texto; alvo.className = "msg " + tipo;
+};
+
+// Abas
+document.getElementById("menu").addEventListener("click", (evento) => {
+  const aba = evento.target.dataset.aba;
+  if (!aba) return;
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("ativa", b === evento.target));
+  document.querySelectorAll("main section").forEach(s => s.classList.toggle("ativa", s.id === aba));
+});
+
+// Organograma
+const montarNo = (unidade) => {
+  const item = document.createElement("li");
+  const rotulo = document.createElement("span");
+  rotulo.className = "no";
+  rotulo.innerHTML = `${unidade.nome} ` +
+    (unidade.sigla ? `<span class="sigla">(${unidade.sigla})</span>` : "") +
+    (unidade.grau ? `<span class="grau">grau ${unidade.grau}</span>` : "");
+  item.appendChild(rotulo);
+  if (unidade.subunidades.length) {
+    const lista = document.createElement("ul");
+    unidade.subunidades.forEach(sub => lista.appendChild(montarNo(sub)));
+    item.appendChild(lista);
+    rotulo.addEventListener("click", () => {
+      lista.style.display = lista.style.display === "none" ? "" : "none";
+    });
+  }
+  return item;
+};
+consultar("/organograma").then(raiz => {
+  const lista = document.createElement("ul");
+  lista.className = "arvore";
+  lista.appendChild(montarNo(raiz));
+  document.getElementById("arvore").appendChild(lista);
+});
+
+// Cargos
+let cargos = [];
+const desenharCargos = () => {
+  const filtro = document.getElementById("filtro-cargo").value.toLowerCase();
+  const corpo = document.querySelector("#tabela-cargos tbody");
+  corpo.innerHTML = "";
+  cargos
+    .filter(c => (c.denominacao + " " + (c.simbolo || "")).toLowerCase().includes(filtro))
+    .forEach(c => {
+      const linha = document.createElement("tr");
+      linha.innerHTML = `<td>${c.denominacao}</td><td>${c.simbolo || "—"}</td>` +
+        `<td>${c.tipo.replace("_", " ").toLowerCase()}</td>` +
+        `<td>${c.vagas}</td><td>${c.vagas_disponiveis}</td>`;
+      corpo.appendChild(linha);
+    });
+};
+consultar("/cargos").then(dados => { cargos = dados; desenharCargos(); });
+document.getElementById("filtro-cargo").addEventListener("input", desenharCargos);
+
+// Unidades nos formulários
+consultar("/unidades").then(unidades => {
+  for (const id of ["proc-unidade", "tram-destino"]) {
+    const seletor = document.getElementById(id);
+    unidades.forEach(u => {
+      const opcao = document.createElement("option");
+      opcao.value = u.id; opcao.textContent = u.nome;
+      seletor.appendChild(opcao);
+    });
+  }
+});
+
+// Protocolo
+document.getElementById("btn-autuar").addEventListener("click", async () => {
+  try {
+    const criado = await enviar("/processos", {
+      tipo: document.getElementById("proc-tipo").value,
+      assunto: document.getElementById("proc-assunto").value,
+      unidade_origem_id: Number(document.getElementById("proc-unidade").value),
+      data_autuacao: document.getElementById("proc-data").value,
+    });
+    mostrar("msg-autuar", `Processo ${criado.numero} autuado (id interno ${criado.id}).`, "ok");
+  } catch (erro) { mostrar("msg-autuar", erro.message, "erro"); }
+});
+
+const carregarProcesso = async () => {
+  const id = document.getElementById("consulta-id").value;
+  try {
+    const processo = await consultar(`/processos/${id}`);
+    mostrar("msg-consulta", "", "");
+    const trilha = processo.tramitacoes.map(t =>
+      `<tr><td>${t.data}</td><td>${t.de}</td><td>${t.para}</td><td>${t.despacho || ""}</td></tr>`
+    ).join("");
+    document.getElementById("detalhe-processo").innerHTML =
+      `<p><strong>${processo.numero}</strong> — ${processo.assunto}<br>` +
+      `Situação: ${processo.situacao} · Autuado em ${processo.data_autuacao}</p>` +
+      (trilha ? `<table><thead><tr><th>Data</th><th>De</th><th>Para</th><th>Despacho</th></tr></thead><tbody>${trilha}</tbody></table>` : "<p>Sem tramitações.</p>");
+    document.getElementById("form-tramitar").style.display = "";
+  } catch (erro) {
+    document.getElementById("detalhe-processo").innerHTML = "";
+    document.getElementById("form-tramitar").style.display = "none";
+    mostrar("msg-consulta", erro.message, "erro");
+  }
+};
+document.getElementById("btn-consultar").addEventListener("click", carregarProcesso);
+document.getElementById("btn-tramitar").addEventListener("click", async () => {
+  const id = document.getElementById("consulta-id").value;
+  try {
+    await enviar(`/processos/${id}/tramitacoes`, {
+      unidade_destino_id: Number(document.getElementById("tram-destino").value),
+      despacho: document.getElementById("tram-despacho").value,
+      data_envio: new Date().toISOString().slice(0, 10),
+    });
+    carregarProcesso();
+  } catch (erro) { mostrar("msg-consulta", erro.message, "erro"); }
+});
+
+// Plenário
+consultar("/parlamentares").then(lista => {
+  const corpo = document.querySelector("#tabela-parlamentares tbody");
+  corpo.innerHTML = lista.length ? "" : "<tr><td colspan=2>Nenhum parlamentar cadastrado.</td></tr>";
+  lista.forEach(parlamentar => {
+    const linha = document.createElement("tr");
+    linha.innerHTML = `<td>${parlamentar.nome}</td><td>${parlamentar.partido || "—"}</td>`;
+    corpo.appendChild(linha);
+  });
+});
+document.getElementById("btn-placar").addEventListener("click", async () => {
+  const sessao = document.getElementById("placar-sessao").value;
+  const proposicao = document.getElementById("placar-prop").value;
+  try {
+    const dados = await consultar(`/sessoes/${sessao}/votacoes/${proposicao}`);
+    mostrar("msg-placar", "", "");
+    const votos = dados.votos.map(v =>
+      `<tr><td>${v.parlamentar}</td><td>${v.partido || "—"}</td><td>${v.voto}</td></tr>`
+    ).join("");
+    document.getElementById("painel-placar").innerHTML =
+      `<div class="placar"><span class="sim">SIM ${dados.contagem.SIM}</span>` +
+      `<span class="nao">NÃO ${dados.contagem.NAO}</span>` +
+      `<span>ABST. ${dados.contagem.ABSTENCAO}</span>` +
+      `<span class="selo ${dados.resultado}">${dados.resultado}</span></div>` +
+      `<p>Modalidade: ${dados.modalidade.toLowerCase()}</p>` +
+      (votos ? `<table><thead><tr><th>Parlamentar</th><th>Partido</th><th>Voto</th></tr></thead><tbody>${votos}</tbody></table>` : "");
+  } catch (erro) {
+    document.getElementById("painel-placar").innerHTML = "";
+    mostrar("msg-placar", erro.message, "erro");
+  }
+});
+</script>
+</body>
+</html>
