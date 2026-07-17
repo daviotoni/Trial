@@ -92,8 +92,15 @@ legislativo, compras e controle/transparência), documentado em
 
 ```bash
 python -m sistema.demo      # cria o banco (SQLite) com schema + seed e verifica
+python -m sistema.cenario   # estudo de caso: nomeações, tramitação e folha
 python -m sistema.gerar_seed > sistema/seed.sql   # regenera a carga inicial
 ```
+
+`sistema/servicos.py` implementa as regras de negócio: nomeações que respeitam
+as vagas do Anexo I e os requisitos de função de confiança (efetivo com 2 anos,
+art. 5º, §3º), protocolo com numeração sequencial, tramitação encadeada e o
+cálculo de folha com as gratificações da lei (GAL com teto de 150%, GRAT-CC de
+100% para efetivo em comissão, GRAT-COM de 40%, REP-TL, GAP, REP-JUD).
 
 A carga inicial é derivada de `orgao/cmdc.py` — as 49 unidades e as 615 vagas
 do Anexo I da Lei 3.525/2025 entram no banco sem digitação manual.

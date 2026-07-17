@@ -63,6 +63,9 @@ CREATE TABLE servidor (
     vinculo        TEXT NOT NULL CHECK (vinculo IN
                      ('EFETIVO', 'COMISSIONADO', 'CEDIDO', 'TEMPORARIO')),
     data_admissao  TEXT NOT NULL,
+    -- Vencimento básico do cargo efetivo (plano de carreira próprio;
+    -- o Anexo I da Lei 3.525/2025 só remunera comissionados/funções)
+    vencimento_base NUMERIC,
     -- Estágio probatório de 36 meses (Lei 1.506/2000, art. 23)
     data_estabilidade TEXT
 );
