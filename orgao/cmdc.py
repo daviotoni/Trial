@@ -14,22 +14,28 @@ integram a hierarquia técnico-administrativa (art. 2º, parágrafo único); a
 Diretoria-Geral é o órgão central de apoio administrativo, diretamente
 subordinada à Presidência (art. 15).
 
-Fontes: texto da lei no site oficial (https://www.cmdc.rj.gov.br/?p=30397) e
-relatório em docs/pesquisa-estrutura-cmdc.md. Os quantitativos de cargos
-comissionados constam do Anexo I da lei, não reproduzido na publicação
-online — por isso este módulo modela unidades e competências, não o quadro
-de cargos completo.
+O Anexo I da lei ("Cargos Isolados de Provimento em Comissão e Funções de
+Confiança Gratificadas") está reproduzido em ANEXO_I: denominação,
+retribuição-base (R$), símbolo e quantitativo. Símbolos FC-(N) indicam que
+só existe a função de confiança, sem cargo em comissão correspondente
+(nota do próprio anexo) — servidor efetivo designado, TipoCargo
+FUNCAO_CONFIANCA; os demais são cargos em comissão.
+
+Fontes: texto integral da lei (site oficial, https://www.cmdc.rj.gov.br/?p=30397)
+e relatório em docs/pesquisa-estrutura-cmdc.md.
 """
 
 from __future__ import annotations
 
 from orgao.modelos import (
     BaseLegal,
+    Cargo,
     Competencia,
     Esfera,
     NaturezaJuridica,
     Orgao,
     Poder,
+    TipoCargo,
     UnidadeAdministrativa,
 )
 
@@ -107,6 +113,141 @@ SERVICOS_AUXILIARES = [
     "Vigilância Patrimonial",
 ]
 
+# Comissões permanentes de apoio à administração (art. 45, §1º). Membros
+# fazem jus a gratificação de 40% (art. 46, §2º).
+COMISSOES_PERMANENTES_ADMINISTRATIVAS = [
+    "Comissão Permanente de Licitação",
+    "Comissão Permanente de Recebimento Definitivo de Obras, Serviços e Bens",
+    "Comissão Permanente de Aplicação de Sanções",
+    "Comissão Permanente de Proteção de Dados Pessoais",
+    "Comissão Permanente de Atualização e Consolidação de Leis e Normas Municipais",
+]
+
+# Anexo I da Lei 3.525/2025: (denominação, retribuição-base R$, símbolo,
+# quantidade). Símbolo FC-* = apenas função de confiança gratificada.
+ANEXO_I = [
+    ("Assessor de Assuntos Especiais", 15925, "DAS-8", 1),
+    ("Controlador-Geral", 15925, "FC-1", 1),
+    ("Diretor da Escola do Legislativo", 15925, "DAS-8", 1),
+    ("Diretor-Geral", 15925, "DAS-8", 1),
+    ("Diretor de Plenário", 15925, "DAS-8", 1),
+    ("Consultor-Geral Legislativo", 15925, "DAS-8", 1),
+    ("Consultor Especial das Comissões Técnicas", 15925, "DAS-8", 1),
+    ("Procurador-Geral", 15925, "DAS-8", 1),
+    ("Superintendente-Geral", 15925, "DAS-8", 1),
+    ("Superintendente de Assuntos Estratégicos", 12250, "SAS-6", 1),
+    ("Ouvidor-Geral", 6870, "CAE-1", 1),
+    ("Secretário Legislativo", 10125, "SL-1", 29),
+    ("Assessor de Mediação de Conflitos", 6870, "ASS-1", 1),
+    ("Assessor Parlamentar I", 6870, "PAR-3", 96),
+    ("Assessor Parlamentar II", 6870, "PAR-2", 96),
+    ("Assistente do Cerimonial e Comunicação", 6870, "ASS-3", 1),
+    ("Assistente do Presidente", 6870, "GAB-3", 4),
+    ("Chefe de Gabinete", 6870, "GAB-1", 29),
+    ("Assessor de Comissão Legislativa e Parlamentar", 6870, "ASS-1", 31),
+    ("Assessor Parlamentar III", 6870, "PAR-1", 70),
+    ("Coord. de Apoio Legislativo", 6870, "FC-2", 1),
+    ("Coord. de Assuntos de Plenário", 6870, "FC-2", 1),
+    ("Coord. de Atas e Projetos", 6870, "FC-2", 1),
+    ("Coord. de Avaliação e Acompanhamento de Compras", 6870, "CAE-1", 1),
+    ("Coord. de Contabilidade", 6870, "FC-2", 1),
+    ("Coord. de Documentação Histórica", 6870, "CAE-1", 1),
+    ("Coord. de Finanças", 6870, "CAE-1", 1),
+    ("Coord. de Cerimonial e Comunicação Social", 6870, "CAE-1", 1),
+    ("Coord. de Licitações e Contratos", 6870, "CAE-1", 1),
+    ("Coord. de Manutenção", 6870, "FC-2", 1),
+    ("Coord. de Material", 6870, "FC-2", 1),
+    ("Coord. de Patrimônio", 6870, "FC-2", 1),
+    ("Coord. de Polícia Legislativa", 6870, "FC-2", 1),
+    ("Coord. de Prevenção a Incêndio", 6870, "FC-2", 1),
+    ("Coord. de Publicações e Transparência", 6870, "CAE-1", 1),
+    ("Coord. de Redação Oficial e Legislativa", 6870, "FC-2", 1),
+    ("Coord. de Recursos Humanos", 6870, "CAE-1", 1),
+    ("Coord. de Tecnologia da Informação e Comunicação", 6870, "FC-2", 1),
+    ("Coord. da Secretaria-Geral", 6870, "FC-2", 1),
+    ("Diretor Administrativo", 6870, "CAE-1", 1),
+    ("Assistente das Comissões Permanentes", 4125, "ASS-5", 33),
+    ("Assessor de Plenário", 4125, "ASS-6", 29),
+    ("Assistente do 1º Secretário", 4125, "ASS-7", 1),
+    ("Assistente do Diretor I", 6870, "ASS-8", 1),
+    ("Assistente do Diretor II", 4125, "ASS-9", 1),
+    ("Assistente de Gabinete I", 3000, "ASS-10", 90),
+    ("Assistente de Gabinete II", 1560, "ASS-11", 70),
+    ("Assessor de Coordenadoria", 6870, "ASS-12", 1),
+    ("Assistente da Coordenadoria", 4125, "ASS-13", 1),
+]
+
+# Dirigente titular de cada unidade, conforme o Anexo I.
+DIRIGENTES_POR_UNIDADE = {
+    "Consultoria-Geral Legislativa": "Consultor-Geral Legislativo",
+    "Controladoria-Geral": "Controlador-Geral",
+    "Diretoria da Escola do Legislativo": "Diretor da Escola do Legislativo",
+    "Diretoria de Plenário": "Diretor de Plenário",
+    "Diretoria-Geral": "Diretor-Geral",
+    "Ouvidoria-Geral": "Ouvidor-Geral",
+    "Procuradoria-Geral": "Procurador-Geral",
+    "Superintendência-Geral": "Superintendente-Geral",
+    "Superintendência de Assuntos Estratégicos": "Superintendente de Assuntos Estratégicos",
+    "Coordenadoria de Apoio Legislativo": "Coord. de Apoio Legislativo",
+    "Coordenadoria de Assuntos de Plenário": "Coord. de Assuntos de Plenário",
+    "Coordenadoria de Atas e Projetos": "Coord. de Atas e Projetos",
+    "Coordenadoria de Avaliação e Acompanhamento de Compras":
+        "Coord. de Avaliação e Acompanhamento de Compras",
+    "Coordenadoria de Cerimonial e Comunicação Social":
+        "Coord. de Cerimonial e Comunicação Social",
+    "Coordenadoria de Contabilidade": "Coord. de Contabilidade",
+    "Coordenadoria de Documentação Histórica": "Coord. de Documentação Histórica",
+    "Coordenadoria de Finanças": "Coord. de Finanças",
+    "Coordenadoria de Licitações e Contratos": "Coord. de Licitações e Contratos",
+    "Coordenadoria de Manutenção": "Coord. de Manutenção",
+    "Coordenadoria de Material": "Coord. de Material",
+    "Coordenadoria de Patrimônio": "Coord. de Patrimônio",
+    "Coordenadoria de Polícia Legislativa": "Coord. de Polícia Legislativa",
+    "Coordenadoria de Prevenção a Incêndio": "Coord. de Prevenção a Incêndio",
+    "Coordenadoria de Publicações e Transparência":
+        "Coord. de Publicações e Transparência",
+    "Coordenadoria de Redação Oficial e Legislativa":
+        "Coord. de Redação Oficial e Legislativa",
+    "Coordenadoria de Recursos Humanos": "Coord. de Recursos Humanos",
+    "Coordenadoria de Tecnologia da Informação e Comunicação":
+        "Coord. de Tecnologia da Informação e Comunicação",
+    "Coordenadoria da Secretaria-Geral": "Coord. da Secretaria-Geral",
+    "Diretoria Administrativa": "Diretor Administrativo",
+}
+
+_ANEXO_I_POR_NOME = {denominacao: (valor, simbolo, qtd)
+                     for denominacao, valor, simbolo, qtd in ANEXO_I}
+
+
+def eh_funcao_confianca(simbolo: str) -> bool:
+    """FC-(N) indica que só há a função de confiança (nota do Anexo I)."""
+    return simbolo.startswith("FC-")
+
+
+def total_vagas_anexo_i() -> int:
+    return sum(qtd for _, _, _, qtd in ANEXO_I)
+
+
+def total_funcoes_gratificadas() -> int:
+    return sum(qtd for _, _, simbolo, qtd in ANEXO_I if eh_funcao_confianca(simbolo))
+
+
+def total_cargos_comissionados() -> int:
+    return total_vagas_anexo_i() - total_funcoes_gratificadas()
+
+
+def _cargo_dirigente(unidade: UnidadeAdministrativa) -> None:
+    """Anexa à unidade o cargo de seu dirigente titular, conforme o Anexo I."""
+    denominacao = DIRIGENTES_POR_UNIDADE.get(unidade.nome)
+    if denominacao is None:
+        return
+    _, simbolo, _ = _ANEXO_I_POR_NOME[denominacao]
+    tipo = (TipoCargo.FUNCAO_CONFIANCA if eh_funcao_confianca(simbolo)
+            else TipoCargo.COMISSAO)
+    unidade.adicionar_cargo(
+        Cargo(f"{denominacao} ({simbolo})", tipo, nivel_hierarquico=3)
+    )
+
 
 def construir_cmdc() -> Orgao:
     """Monta a CMDC conforme a Lei 3.525/2025."""
@@ -162,6 +303,18 @@ def construir_cmdc() -> Orgao:
         unidade.adicionar_competencia(
             Competencia("Órgão superior de direção e assessoramento técnico", LEI_3525)
         )
+        _cargo_dirigente(unidade)
+
+    # Comissões permanentes de apoio à administração (art. 45, §1º).
+    for nome in COMISSOES_PERMANENTES_ADMINISTRATIVAS:
+        comissao = mesa.adicionar_subunidade(UnidadeAdministrativa(nome=nome))
+        comissao.adicionar_competencia(
+            Competencia(
+                "Órgão colegiado de apoio à administração; membros com "
+                "gratificação de 40% (art. 46, §2º)",
+                LEI_3525,
+            )
+        )
 
     # Diretoria-Geral: órgão central de apoio administrativo (art. 15).
     diretoria_geral = presidencia.adicionar_subunidade(
@@ -175,7 +328,11 @@ def construir_cmdc() -> Orgao:
         )
     )
     for nome in COORDENADORIAS:
-        diretoria_geral.adicionar_subunidade(UnidadeAdministrativa(nome=nome))
+        unidade = diretoria_geral.adicionar_subunidade(
+            UnidadeAdministrativa(nome=nome)
+        )
+        _cargo_dirigente(unidade)
+    _cargo_dirigente(diretoria_geral)
 
     # Serviços auxiliares (4º grau) — sob a Diretoria Administrativa.
     diretoria_admin = next(

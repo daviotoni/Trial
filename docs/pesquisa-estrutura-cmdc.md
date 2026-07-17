@@ -21,16 +21,24 @@ vigente que define os setores que o sistema precisa atender.
 Pontos estruturais da lei:
 
 - **Presidência e Mesa Diretora** exercem *comando político-institucional* e **não integram a
-  hierarquia técnico-administrativa** (art. 2º, parágrafo único).
+  hierarquia técnico-administrativa** (art. 2º, parágrafo único). Os Gabinetes dos membros da
+  Mesa e dos Vereadores são considerados unidades administrativas (art. 1º, parágrafo único).
 - A **Diretoria-Geral** é o *órgão central de apoio administrativo*, **diretamente subordinada
   à Presidência** (art. 15).
-- Cargos comissionados (quantitativos, denominações, lotações e remunerações) e funções
-  gratificadas constam do **Anexo I** (art. 3º, §1º e art. 5º, §1º) — *os anexos não estão
-  reproduzidos na publicação online; é preciso obtê-los na íntegra junto à CMDC*.
-- A Mesa Diretora pode transformar, extinguir ou remanejar cargos comissionados sem aumento
-  de despesa (art. 3º, §5º).
-- Órgãos de 3º grau são lotados nos Gabinetes de Vereadores e da Mesa, com provimento por
-  indicação dos titulares (art. 3º, §2º).
+- Cargos comissionados são providos por **Portaria do Presidente** (art. 3º); os lotados em
+  gabinetes, por indicação dos titulares (§2º), podendo atuar em regime externo, escalas
+  diferenciadas, fins de semana/noturno e trabalho remoto (§3º).
+- Servidor efetivo nomeado para cargo em comissão recebe **gratificação de 100% do valor do
+  cargo** enquanto durar o exercício (art. 3º, §4º).
+- A Mesa Diretora pode transformar, extinguir ou remanejar cargos comissionados e funções
+  gratificadas por Resolução, sem aumento de despesa (art. 3º, §5º).
+- Funções de confiança gratificadas exigem ato do Presidente, qualificação compatível e
+  **mínimo de 2 anos de efetivo exercício** na Câmara (art. 5º, §3º); guardam equivalência
+  remuneratória com os cargos em comissão de símbolo correspondente (§4º).
+- **Vigência**: publicada em 29/08/2025, com efeitos financeiros a partir de **01/09/2025**
+  (art. 102). **Extingue** todos os cargos comissionados das Leis 2.653/2014 e 3.233/2022 e
+  os que não constem da nova lei (art. 99); revoga o Anexo Único e art. 3º da Lei 2.653/2014
+  e dispositivos da Lei 3.233/2022 (art. 101).
 
 ### 1.1 Estrutura em quatro graus funcionais
 
@@ -79,6 +87,54 @@ telefonia, reprografia, limpeza, transporte e vigilância patrimonial.
 | Art. 46, §2º | Gratificação de Comissão | Membros de comissões e agentes de contratação | **40%** |
 
 Critérios específicos da GAL serão definidos em Resolução posterior (art. 7º, parágrafo único).
+A gratificação de comissão (arts. 46–47) é **indenizatória, precária e não incorporável**, paga
+só durante atuação efetiva, com base de incidência à escolha do servidor efetivo que também
+ocupe cargo comissionado (art. 46, §3º) — regra de folha não trivial que o sistema deve suportar.
+
+### 1.3 Anexo I — quadro de cargos comissionados e funções gratificadas (615 vagas)
+
+O Anexo I ("Cargos Isolados de Provimento em Comissão e Funções de Confiança Gratificadas")
+traz 49 denominações somando **615 vagas**: **602 cargos em comissão** e **13 funções de
+confiança** (símbolos FC-1/FC-2, que por nota do próprio anexo existem apenas como função
+gratificada, sem cargo em comissão correspondente — ou seja, exercidas por servidores efetivos).
+
+Faixas de retribuição-base: R$ 15.925 (DAS-8/FC-1 — direção superior), R$ 12.250 (SAS-6),
+R$ 10.125 (SL-1), R$ 6.870 (CAE-1, FC-2, GAB-1, PAR-2/3, ASS diversos), R$ 4.125, R$ 3.000
+e R$ 1.560.
+
+Destaques quantitativos (espelham os 29 gabinetes parlamentares):
+
+| Cargo | Símbolo | Vagas | Retribuição (R$) |
+|---|---|---|---|
+| Assessor Parlamentar I | PAR-3 | 96 | 6.870 |
+| Assessor Parlamentar II | PAR-2 | 96 | 6.870 |
+| Assistente de Gabinete I | ASS-10 | 90 | 3.000 |
+| Assessor Parlamentar III | PAR-1 | 70 | 6.870 |
+| Assistente de Gabinete II | ASS-11 | 70 | 1.560 |
+| Assistente das Comissões Permanentes | ASS-5 | 33 | 4.125 |
+| Assessor de Comissão Legislativa e Parlamentar | ASS-1 | 31 | 6.870 |
+| Secretário Legislativo | SL-1 | 29 | 10.125 |
+| Chefe de Gabinete | GAB-1 | 29 | 6.870 |
+| Assessor de Plenário | ASS-6 | 29 | 4.125 |
+
+Dirigentes de unidade: 8 cargos DAS-8 de R$ 15.925 (Diretor-Geral, Procurador-Geral,
+Consultor-Geral Legislativo, Diretor de Plenário, Diretor da Escola do Legislativo,
+Superintendente-Geral, Assessor de Assuntos Especiais, Consultor Especial das Comissões
+Técnicas), Controlador-Geral como **função de confiança FC-1** (controle interno exercido por
+efetivo), Superintendente de Assuntos Estratégicos (SAS-6), Ouvidor-Geral e Diretor
+Administrativo (CAE-1) e os 20 coordenadores (FC-2 ou CAE-1).
+
+> A tabela completa do Anexo I está codificada em `orgao/cmdc.py` (`ANEXO_I`).
+
+### 1.4 Comissões permanentes de apoio à administração (art. 45)
+
+Cinco comissões permanentes, com membros preferencialmente efetivos e gratificação de 40%:
+**Licitação**, **Recebimento Definitivo de Obras, Serviços e Bens**, **Aplicação de Sanções**
+(arts. 156–160 da Lei 14.133/2021), **Proteção de Dados Pessoais** (adequação à LGPD, em
+articulação com a ANPD) e **Atualização e Consolidação de Leis e Normas Municipais**.
+Comissões temporárias: até 180 dias, prorrogáveis por 90 (art. 47). O **Departamento do
+e-Social** (4º grau, art. 48) integra RH, Contabilidade e Controle Interno para as obrigações
+do eSocial — integração obrigatória do módulo de folha.
 
 ---
 
@@ -159,16 +215,19 @@ baseline para o módulo legislativo (avaliar integrar ou substituir).
 
 ## 5. Lacunas a resolver antes da modelagem final
 
-1. **Anexos I–III da Lei 3.525/2025** (quantitativos, símbolos e remuneração dos comissionados
-   e funções gratificadas) não estão na publicação online — obter cópia integral na CMDC.
+1. ~~Anexos da Lei 3.525/2025~~ — **resolvido**: o Anexo I (615 vagas) foi obtido do texto
+   integral e está codificado em `orgao/cmdc.py`. O Anexo II é o organograma em imagem
+   (não capturado no texto); solicitar o arquivo gráfico à CMDC se necessário.
 2. **Regimento Interno** e **Lei Orgânica**: as versões consolidadas não puderam ser
    verificadas nas fontes confiáveis desta rodada (as páginas do leismunicipais.com.br não
    passaram na verificação); confirmar no site oficial os fluxos regimentais de tramitação.
-3. Subordinação exata de cada coordenadoria de 2º grau (a lei indica subordinação à
-   Diretoria-Geral, mas o detalhamento por órgão superior precisa ser conferido no texto
-   integral com anexos).
-4. Plano de cargos e carreiras posterior a 2012 (se houver lei específica atualizando o
-   quadro efetivo).
+3. Plano de cargos e carreiras **efetivos** posterior a 2012 (se houver lei específica
+   atualizando o quadro de concursados) — a Lei 3.525/2025 disciplina comissionados e
+   funções gratificadas, e menciona a carreira de Técnico Legislativo (art. 8º) sem
+   reestruturá-la.
+4. Resolução da Mesa Diretora com os critérios de fixação do percentual da GAL
+   (art. 7º, parágrafo único) — necessária para parametrizar a folha.
+5. Lei nº 3.226/2022 (benefícios do art. 17, referida no art. 4º da Lei 3.525/2025).
 
 ---
 
