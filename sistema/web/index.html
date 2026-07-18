@@ -78,6 +78,9 @@
   <button data-aba="cargos">Cargos e vagas</button>
   <button data-aba="protocolo">Protocolo</button>
   <button data-aba="plenario">Plenário</button>
+  <button data-aba="compras">Compras</button>
+  <button data-aba="folha">Folha</button>
+  <button data-aba="auditoria">Auditoria</button>
 </nav>
 <main>
 
@@ -164,6 +167,83 @@
     <h2>Parlamentares</h2>
     <table id="tabela-parlamentares">
       <thead><tr><th>Nome</th><th>Partido</th></tr></thead><tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="compras">
+  <div class="linha">
+    <div class="cartao">
+      <h2>Nova contratação (Lei 14.133/2021)</h2>
+      <label>Modalidade</label>
+      <select id="ct-modalidade">
+        <option>PREGAO</option><option>CONCORRENCIA</option>
+        <option>DISPENSA</option><option>INEXIGIBILIDADE</option>
+      </select>
+      <label>Objeto</label>
+      <input id="ct-objeto" placeholder="Ex.: Serviços de limpeza predial">
+      <label>Valor estimado (R$)</label>
+      <input id="ct-valor" type="number" min="0" step="0.01">
+      <label>Unidade demandante</label>
+      <select id="ct-unidade"></select>
+      <label>Data</label>
+      <input id="ct-data" type="date">
+      <button class="acao" id="btn-contratacao">Abrir contratação</button>
+      <div class="msg" id="msg-contratacao"></div>
+    </div>
+    <div class="cartao">
+      <h2>Contratações</h2>
+      <button class="acao" id="btn-recarregar-contratacoes">Atualizar</button>
+      <table id="tabela-contratacoes">
+        <thead><tr><th>Nº</th><th>Objeto</th><th>Estimado (R$)</th>
+          <th>Situação</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="folha">
+  <div class="linha">
+    <div class="cartao">
+      <h2>Calcular folha</h2>
+      <label>Competência</label>
+      <input id="fl-competencia" type="month">
+      <label>Percentual da GAL (teto 150%, art. 7º)</label>
+      <input id="fl-gal" type="number" min="0" max="150" value="100">
+      <button class="acao" id="btn-calcular-folha">Calcular</button>
+      <div class="msg" id="msg-folha"></div>
+    </div>
+    <div class="cartao">
+      <h2>Folhas</h2>
+      <button class="acao" id="btn-recarregar-folhas">Atualizar</button>
+      <table id="tabela-folhas">
+        <thead><tr><th>Competência</th><th>Status</th><th>Total (R$)</th>
+          <th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="cartao" id="detalhe-folha" style="display:none">
+    <h2 id="titulo-detalhe-folha">Detalhe</h2>
+    <table id="tabela-itens-folha">
+      <thead><tr><th>Servidor</th><th>Rubrica</th><th>Base</th><th>%</th>
+        <th>Valor (R$)</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="auditoria">
+  <div class="cartao">
+    <h2>Trilha de auditoria (Controladoria-Geral)</h2>
+    <p>Requer login com perfil CONTROLE ou ADMIN.</p>
+    <button class="acao" id="btn-recarregar-auditoria">Atualizar</button>
+    <div class="msg" id="msg-auditoria"></div>
+    <table id="tabela-auditoria">
+      <thead><tr><th>Data/hora</th><th>Usuário</th><th>Tabela</th>
+        <th>Operação</th><th>Detalhes</th></tr></thead>
+      <tbody></tbody>
     </table>
   </div>
 </section>
@@ -309,9 +389,141 @@ const desenharCargos = () => {
 consultar("/cargos").then(dados => { cargos = dados; desenharCargos(); });
 document.getElementById("filtro-cargo").addEventListener("input", desenharCargos);
 
+// Compras
+const carregarContratacoes = async () => {
+  const corpo = document.querySelector("#tabela-contratacoes tbody");
+  const lista = await consultar("/contratacoes");
+  corpo.innerHTML = lista.length ? "" :
+    "<tr><td colspan=5>Nenhuma contratação.</td></tr>";
+  lista.forEach(c => {
+    const linha = document.createElement("tr");
+    linha.innerHTML = `<td>${c.numero}</td><td>${c.objeto}</td>` +
+      `<td>${Number(c.valor_estimado || 0).toLocaleString("pt-BR")}</td>` +
+      `<td>${c.situacao}</td><td></td>`;
+    if (c.situacao === "EM_ANDAMENTO") {
+      const botao = document.createElement("button");
+      botao.className = "acao"; botao.textContent = "Homologar";
+      botao.addEventListener("click", async () => {
+        try {
+          await enviar(`/contratacoes/${c.id}/homologacao`,
+                       {data: new Date().toISOString().slice(0, 10)});
+          carregarContratacoes();
+        } catch (erro) { mostrar("msg-contratacao", erro.message, "erro"); }
+      });
+      linha.lastChild.appendChild(botao);
+    }
+    corpo.appendChild(linha);
+  });
+};
+document.getElementById("btn-recarregar-contratacoes")
+  .addEventListener("click", carregarContratacoes);
+carregarContratacoes();
+document.getElementById("btn-contratacao").addEventListener("click", async () => {
+  try {
+    const criada = await enviar("/contratacoes", {
+      modalidade: document.getElementById("ct-modalidade").value,
+      objeto: document.getElementById("ct-objeto").value,
+      valor_estimado: Number(document.getElementById("ct-valor").value),
+      unidade_demandante_id: Number(document.getElementById("ct-unidade").value),
+      data: document.getElementById("ct-data").value,
+    });
+    mostrar("msg-contratacao", `Aberta: ${criada.numero}`, "ok");
+    carregarContratacoes();
+  } catch (erro) { mostrar("msg-contratacao", erro.message, "erro"); }
+});
+
+// Folha
+const verFolha = async (id) => {
+  const folha = await consultar(`/folhas/${id}`);
+  document.getElementById("detalhe-folha").style.display = "";
+  document.getElementById("titulo-detalhe-folha").textContent =
+    `Folha ${folha.competencia} — ${folha.status} — total R$ ` +
+    Number(folha.total).toLocaleString("pt-BR", {minimumFractionDigits: 2});
+  const corpo = document.querySelector("#tabela-itens-folha tbody");
+  corpo.innerHTML = "";
+  folha.itens.forEach(item => {
+    const linha = document.createElement("tr");
+    linha.innerHTML = `<td>${item.servidor}</td><td>${item.rubrica}</td>` +
+      `<td>${Number(item.base).toLocaleString("pt-BR")}</td>` +
+      `<td>${item.percentual ?? "—"}</td>` +
+      `<td>${Number(item.valor).toLocaleString("pt-BR", {minimumFractionDigits: 2})}</td>`;
+    corpo.appendChild(linha);
+  });
+};
+const carregarFolhas = async () => {
+  const corpo = document.querySelector("#tabela-folhas tbody");
+  try {
+    const lista = await consultar("/folhas");
+    corpo.innerHTML = lista.length ? "" :
+      "<tr><td colspan=4>Nenhuma folha calculada.</td></tr>";
+    lista.forEach(f => {
+      const linha = document.createElement("tr");
+      linha.innerHTML = `<td>${f.competencia}</td><td>${f.status}</td>` +
+        `<td>${Number(f.total).toLocaleString("pt-BR", {minimumFractionDigits: 2})}</td><td></td>`;
+      const celula = linha.lastChild;
+      const botaoVer = document.createElement("button");
+      botaoVer.className = "acao"; botaoVer.textContent = "Ver";
+      botaoVer.addEventListener("click", () => verFolha(f.id));
+      celula.appendChild(botaoVer);
+      const proxima = {CALCULADA: "fechamento", FECHADA: "pagamento"}[f.status];
+      if (proxima) {
+        const botao = document.createElement("button");
+        botao.className = "acao"; botao.style.marginLeft = "6px";
+        botao.textContent = proxima === "fechamento" ? "Fechar" : "Pagar";
+        botao.addEventListener("click", async () => {
+          try { await enviar(`/folhas/${f.id}/${proxima}`, {}); carregarFolhas(); }
+          catch (erro) { mostrar("msg-folha", erro.message, "erro"); }
+        });
+        celula.appendChild(botao);
+      }
+      corpo.appendChild(linha);
+    });
+  } catch (erro) {
+    corpo.innerHTML = `<tr><td colspan=4>${erro.message}</td></tr>`;
+  }
+};
+document.getElementById("btn-recarregar-folhas")
+  .addEventListener("click", carregarFolhas);
+carregarFolhas();
+document.getElementById("btn-calcular-folha").addEventListener("click", async () => {
+  try {
+    const folha = await enviar("/folhas", {
+      competencia: document.getElementById("fl-competencia").value,
+      percentual_gal: Number(document.getElementById("fl-gal").value),
+    });
+    mostrar("msg-folha", `Folha calculada — total R$ ` +
+      Number(folha.total).toLocaleString("pt-BR", {minimumFractionDigits: 2}), "ok");
+    carregarFolhas(); verFolha(folha.id);
+  } catch (erro) { mostrar("msg-folha", erro.message, "erro"); }
+});
+
+// Auditoria
+const carregarAuditoria = async () => {
+  const corpo = document.querySelector("#tabela-auditoria tbody");
+  try {
+    const trilha = await consultar("/auditoria");
+    mostrar("msg-auditoria", "", "");
+    corpo.innerHTML = trilha.length ? "" :
+      "<tr><td colspan=5>Nenhum evento registrado.</td></tr>";
+    trilha.forEach(evento => {
+      const linha = document.createElement("tr");
+      linha.innerHTML = `<td>${evento.datahora}</td><td>${evento.usuario}</td>` +
+        `<td>${evento.tabela}</td><td>${evento.operacao}</td>` +
+        `<td>${evento.detalhes || ""}</td>`;
+      corpo.appendChild(linha);
+    });
+  } catch (erro) {
+    corpo.innerHTML = "";
+    mostrar("msg-auditoria", erro.message, "erro");
+  }
+};
+document.getElementById("btn-recarregar-auditoria")
+  .addEventListener("click", carregarAuditoria);
+carregarAuditoria();
+
 // Unidades nos formulários
 consultar("/unidades").then(unidades => {
-  for (const id of ["proc-unidade", "tram-destino"]) {
+  for (const id of ["proc-unidade", "tram-destino", "ct-unidade"]) {
     const seletor = document.getElementById(id);
     unidades.forEach(u => {
       const opcao = document.createElement("option");

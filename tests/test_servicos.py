@@ -89,6 +89,55 @@ class TestProtocolo(unittest.TestCase):
         self.assertEqual(origens, [1, 2])  # cada envio parte do destino anterior
 
 
+class TestCiclosDeVida(unittest.TestCase):
+    def setUp(self):
+        self.banco = criar_banco()
+
+    def tearDown(self):
+        self.banco.close()
+
+    def test_processo_arquiva_e_nao_tramita(self):
+        pid, _ = servicos.autuar_processo(self.banco, "ADMINISTRATIVO", "A",
+                                          1, "2026-01-05")
+        servicos.arquivar_processo(self.banco, pid)
+        with self.assertRaises(RegraViolada):
+            servicos.tramitar(self.banco, pid, 2, "x", "2026-01-06")
+        servicos.desarquivar_processo(self.banco, pid)
+        servicos.tramitar(self.banco, pid, 2, "x", "2026-01-07")
+
+    def test_processo_concluido_nao_conclui_de_novo(self):
+        pid, _ = servicos.autuar_processo(self.banco, "ADMINISTRATIVO", "B",
+                                          1, "2026-01-05")
+        servicos.concluir_processo(self.banco, pid)
+        with self.assertRaises(RegraViolada):
+            servicos.concluir_processo(self.banco, pid)
+
+    def test_recebimento_de_tramitacao(self):
+        pid, _ = servicos.autuar_processo(self.banco, "ADMINISTRATIVO", "C",
+                                          1, "2026-01-05")
+        tid = servicos.tramitar(self.banco, pid, 2, "x", "2026-01-06")
+        servicos.receber_tramitacao(self.banco, tid, "2026-01-07")
+        with self.assertRaises(RegraViolada):
+            servicos.receber_tramitacao(self.banco, tid, "2026-01-08")
+
+    def test_folha_recalcula_ate_fechar(self):
+        self.banco.execute(
+            "INSERT INTO servidor (nome, vinculo, data_admissao, "
+            "vencimento_base) VALUES ('Efetiva', 'EFETIVO', '2020-01-01', 4000)")
+        folha1 = servicos.calcular_folha(self.banco, "2026-01",
+                                         percentual_gal=50)
+        folha2 = servicos.calcular_folha(self.banco, "2026-01",
+                                         percentual_gal=100)
+        # Recalcular reutiliza a mesma folha, sem duplicar competência.
+        self.assertEqual(folha1, folha2)
+        servicos.fechar_folha(self.banco, folha2)
+        with self.assertRaises(RegraViolada):
+            servicos.calcular_folha(self.banco, "2026-01", percentual_gal=80)
+        servicos.pagar_folha(self.banco, folha2)
+        with self.assertRaises(RegraViolada):
+            servicos.fechar_folha(self.banco, folha2)
+
+
 class TestFolha(unittest.TestCase):
     def setUp(self):
         self.banco = criar_banco()

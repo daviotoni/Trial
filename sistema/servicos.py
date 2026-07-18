@@ -180,6 +180,46 @@ def autuar_processo(
     return cursor.lastrowid, f"{numero}/{ano}"
 
 
+def receber_tramitacao(banco: sqlite3.Connection, tramitacao_id: int,
+                       data_recebimento: str) -> None:
+    """Registra o recebimento pela unidade de destino."""
+    alterados = banco.execute(
+        "UPDATE tramitacao SET data_recebimento = ? "
+        "WHERE id = ? AND data_recebimento IS NULL",
+        (data_recebimento, tramitacao_id),
+    ).rowcount
+    if not alterados:
+        raise RegraViolada("tramitação inexistente ou já recebida")
+
+
+def _mudar_situacao_processo(banco, processo_id, de, para):
+    linha = banco.execute(
+        "SELECT situacao FROM processo WHERE id = ?", (processo_id,)
+    ).fetchone()
+    if linha is None:
+        raise RegraViolada("processo inexistente")
+    if linha[0] not in de:
+        raise RegraViolada(f"processo está '{linha[0]}'; transição inválida")
+    banco.execute("UPDATE processo SET situacao = ? WHERE id = ?",
+                  (para, processo_id))
+
+
+def arquivar_processo(banco: sqlite3.Connection, processo_id: int) -> None:
+    _mudar_situacao_processo(
+        banco, processo_id, {"EM_TRAMITACAO", "SOBRESTADO", "CONCLUIDO"},
+        "ARQUIVADO")
+
+
+def concluir_processo(banco: sqlite3.Connection, processo_id: int) -> None:
+    _mudar_situacao_processo(
+        banco, processo_id, {"EM_TRAMITACAO", "SOBRESTADO"}, "CONCLUIDO")
+
+
+def desarquivar_processo(banco: sqlite3.Connection, processo_id: int) -> None:
+    _mudar_situacao_processo(banco, processo_id, {"ARQUIVADO"},
+                             "EM_TRAMITACAO")
+
+
 def tramitar(
     banco: sqlite3.Connection,
     processo_id: int,
@@ -193,8 +233,8 @@ def tramitar(
     ).fetchone()
     if situacao is None:
         raise RegraViolada("processo inexistente")
-    if situacao[0] == "ARQUIVADO":
-        raise RegraViolada("processo arquivado não tramita")
+    if situacao[0] in ("ARQUIVADO", "CONCLUIDO"):
+        raise RegraViolada(f"processo {situacao[0].lower()} não tramita")
 
     atual = banco.execute(
         """SELECT COALESCE(
@@ -247,10 +287,23 @@ def calcular_folha(
     if percentual_gal > _teto(banco, "GAL"):
         raise RegraViolada("GAL acima do teto de 150% (art. 7º)")
 
-    folha_id = banco.execute(
-        "INSERT INTO folha (competencia, status) VALUES (?, 'CALCULADA')",
-        (competencia,),
-    ).lastrowid
+    existente = banco.execute(
+        "SELECT id, status FROM folha WHERE competencia = ?", (competencia,)
+    ).fetchone()
+    if existente:
+        folha_id, status = existente
+        if status in ("FECHADA", "PAGA"):
+            raise RegraViolada(
+                f"folha {competencia} está {status}; não pode ser recalculada")
+        # Recalcula: descarta os itens do cálculo anterior.
+        banco.execute("DELETE FROM folha_item WHERE folha_id = ?", (folha_id,))
+        banco.execute("UPDATE folha SET status = 'CALCULADA' WHERE id = ?",
+                      (folha_id,))
+    else:
+        folha_id = banco.execute(
+            "INSERT INTO folha (competencia, status) VALUES (?, 'CALCULADA')",
+            (competencia,),
+        ).lastrowid
 
     def lancar(servidor_id, rubrica, base, percentual):
         valor = round(base * (percentual / 100 if percentual else 1), 2)
@@ -330,6 +383,26 @@ def calcular_folha(
             lancar(servidor_id, "GRAT-COM", base, _teto(banco, "GRAT-COM"))
 
     return folha_id
+
+
+def _mudar_status_folha(banco, folha_id, de, para):
+    linha = banco.execute(
+        "SELECT status FROM folha WHERE id = ?", (folha_id,)
+    ).fetchone()
+    if linha is None:
+        raise RegraViolada("folha inexistente")
+    if linha[0] != de:
+        raise RegraViolada(f"folha está '{linha[0]}'; esperado '{de}'")
+    banco.execute("UPDATE folha SET status = ? WHERE id = ?", (para, folha_id))
+
+
+def fechar_folha(banco: sqlite3.Connection, folha_id: int) -> None:
+    """Fecha a folha calculada — a partir daqui não recalcula mais."""
+    _mudar_status_folha(banco, folha_id, "CALCULADA", "FECHADA")
+
+
+def pagar_folha(banco: sqlite3.Connection, folha_id: int) -> None:
+    _mudar_status_folha(banco, folha_id, "FECHADA", "PAGA")
 
 
 def total_folha(banco: sqlite3.Connection, folha_id: int) -> float:

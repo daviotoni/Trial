@@ -44,9 +44,11 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 PAGINA_WEB = Path(__file__).parent / "web" / "index.html"
 
@@ -68,6 +70,7 @@ class Aplicacao:
         self.trava = threading.Lock()
         self.sessoes = autenticacao.Sessoes()
         self.usuario_atual: dict | None = None
+        self.query_atual: dict = {}
         if autenticacao.garantir_admin_inicial(self.banco):
             self.banco.commit()
 
@@ -140,6 +143,47 @@ class Aplicacao:
                 "SELECT id, nome, matricula, vinculo, data_admissao "
                 "FROM servidor ORDER BY id"
             )
+        ]
+
+    def listar_processos(self, filtros):
+        condicoes, valores = [], []
+        if filtros.get("situacao"):
+            condicoes.append("situacao = ?")
+            valores.append(filtros["situacao"][0])
+        if filtros.get("ano"):
+            condicoes.append("ano = ?")
+            valores.append(int(filtros["ano"][0]))
+        clausula = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+        return [
+            {"id": pid, "numero": f"{numero}/{ano}", "tipo": tipo,
+             "assunto": assunto, "situacao": situacao, "data": data}
+            for pid, numero, ano, tipo, assunto, situacao, data in
+            self.banco.execute(
+                f"SELECT id, numero, ano, tipo, assunto, situacao, "
+                f"data_autuacao FROM processo {clausula} "
+                f"ORDER BY ano DESC, numero DESC LIMIT 100", valores)
+        ]
+
+    def listar_contratacoes(self):
+        return [
+            {"id": cid, "numero": f"{modalidade} {numero}/{ano}",
+             "objeto": objeto, "valor_estimado": valor, "situacao": situacao}
+            for cid, modalidade, numero, ano, objeto, valor, situacao in
+            self.banco.execute(
+                "SELECT id, modalidade, numero, ano, objeto, valor_estimado, "
+                "situacao FROM contratacao ORDER BY ano DESC, numero DESC "
+                "LIMIT 100")
+        ]
+
+    def listar_folhas(self):
+        return [
+            {"id": fid, "competencia": competencia, "status": status,
+             "total": total or 0}
+            for fid, competencia, status, total in self.banco.execute(
+                """SELECT f.id, f.competencia, f.status,
+                          (SELECT SUM(valor) FROM folha_item
+                            WHERE folha_id = f.id)
+                   FROM folha f ORDER BY f.competencia DESC LIMIT 60""")
         ]
 
     def processo(self, processo_id: int):
@@ -225,6 +269,26 @@ class Aplicacao:
         )
         self.banco.commit()
         return {"id": tid}
+
+    def receber_tramitacao(self, tramitacao_id: int, dados):
+        servicos.receber_tramitacao(self.banco, tramitacao_id,
+                                    dados["data_recebimento"])
+        self.banco.commit()
+        return {"id": tramitacao_id}
+
+    def situacao_processo(self, processo_id: int, acao: str):
+        {"arquivamento": servicos.arquivar_processo,
+         "conclusao": servicos.concluir_processo,
+         "desarquivamento": servicos.desarquivar_processo}[acao](
+            self.banco, processo_id)
+        self.banco.commit()
+        return self.processo(processo_id)
+
+    def situacao_folha(self, folha_id: int, acao: str):
+        {"fechamento": servicos.fechar_folha,
+         "pagamento": servicos.pagar_folha}[acao](self.banco, folha_id)
+        self.banco.commit()
+        return {"id": folha_id}
 
     def calcular_folha(self, dados):
         folha_id = servicos.calcular_folha(
@@ -370,13 +434,25 @@ ROTAS = [
     ("POST", r"^/provimentos/(\d+)/exoneracao$", "PESSOAL",
      lambda app, m, d: app.exonerar(int(m.group(1)), d)),
     ("POST", r"^/processos$", "PROTOCOLO", lambda app, m, d: app.autuar(d)),
+    ("GET", r"^/processos$", None,
+     lambda app, m, d: app.listar_processos(app.query_atual)),
     ("GET", r"^/processos/(\d+)$", None,
      lambda app, m, d: app.processo(int(m.group(1)))),
     ("POST", r"^/processos/(\d+)/tramitacoes$", "PROTOCOLO",
      lambda app, m, d: app.tramitar(int(m.group(1)), d)),
+    ("POST", r"^/tramitacoes/(\d+)/recebimento$", "PROTOCOLO",
+     lambda app, m, d: app.receber_tramitacao(int(m.group(1)), d)),
+    ("POST", r"^/processos/(\d+)/(arquivamento|conclusao|desarquivamento)$",
+     "PROTOCOLO",
+     lambda app, m, d: app.situacao_processo(int(m.group(1)), m.group(2))),
     ("POST", r"^/folhas$", "FOLHA", lambda app, m, d: app.calcular_folha(d)),
+    ("GET", r"^/folhas$", "FOLHA", lambda app, m, d: app.listar_folhas()),
     ("GET", r"^/folhas/(\d+)$", "FOLHA",
      lambda app, m, d: app.folha(int(m.group(1)))),
+    ("POST", r"^/folhas/(\d+)/(fechamento|pagamento)$", "FOLHA",
+     lambda app, m, d: app.situacao_folha(int(m.group(1)), m.group(2))),
+    ("GET", r"^/contratacoes$", None,
+     lambda app, m, d: app.listar_contratacoes()),
     ("GET", r"^/parlamentares$", None, lambda app, m, d: app.parlamentares()),
     ("POST", r"^/parlamentares$", "LEGISLATIVO", lambda app, m, d: app.empossar(d)),
     ("POST", r"^/legislaturas$", "LEGISLATIVO",
@@ -428,10 +504,11 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:"):
                     return self._responder(400, {"erro": "JSON inválido"})
             autorizacao = self.headers.get("Authorization", "")
             token = autorizacao.removeprefix("Bearer ").strip() or None
+            url = urlparse(self.path)
             for verbo, padrao, area, acao in ROTAS:
                 if verbo != metodo:
                     continue
-                m = re.match(padrao, self.path.split("?")[0])
+                m = re.match(padrao, url.path)
                 if m:
                     try:
                         with aplicacao.trava:
@@ -439,6 +516,7 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:"):
                             if area is not None:
                                 autenticacao.exigir(usuario, area)
                             aplicacao.usuario_atual = usuario
+                            aplicacao.query_atual = parse_qs(url.query)
                             return self._responder(200, acao(aplicacao, m, corpo))
                     except NaoAutenticado as erro:
                         return self._responder(401, {"erro": str(erro)})
@@ -449,6 +527,10 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:"):
                         return self._responder(422, {"erro": str(erro)})
                     except Recurso404:
                         return self._responder(404, {"erro": "não encontrado"})
+                    except sqlite3.IntegrityError as erro:
+                        aplicacao.banco.rollback()
+                        return self._responder(
+                            422, {"erro": f"violação de integridade: {erro}"})
                     except KeyError as erro:
                         aplicacao.banco.rollback()
                         return self._responder(
