@@ -23,6 +23,36 @@ import sqlite3
 
 from sistema.servicos import RegraViolada, autuar_processo
 
+# Comissões permanentes temáticas do art. 33 do Regimento Interno
+# (Resolução nº 1.835/2000, com a redação da Resolução nº 2.399/2013).
+# Não confundir com as comissões administrativas do art. 45 da Lei 3.525/2025.
+COMISSOES_PERMANENTES_REGIMENTAIS = [
+    "Comissão de Legislação, Justiça e Redação Final",
+    "Comissão de Finanças e Orçamento",
+    "Comissão de Educação e Cultura",
+    "Comissão de Saúde e Assistência Social",
+    "Comissão de Transportes",
+    "Comissão de Defesa do Consumidor",
+    "Comissão de Obras e Serviços Públicos",
+    "Comissão de Meio Ambiente e Qualidade de Vida",
+    "Comissão de Fiscalização",
+    "Comissão de Desenvolvimento Urbano",
+    "Comissão dos Direitos da Mulher e da Criança e Adolescente",
+    "Comissão da Defesa dos Direitos Humanos",
+    "Comissão de Defesa dos Portadores de Necessidades Especiais",
+    "Comissão de Segurança Alimentar e Nutricional",
+    "Comissão de Segurança",
+    "Comissão de Esporte, Lazer e Turismo",
+    "Comissão de Prevenção e Combate às Drogas",
+    "Comissão de Prevenção e Combate à Pirataria",
+    "Comissão de Defesa dos Direitos dos Idosos",
+    "Comissão de Defesa dos Direitos da Juventude",
+]
+
+# Tipos de proposição que exigem maioria absoluta dos MEMBROS da Câmara
+# (art. 178 do Regimento: Projetos de Lei Complementar à Lei Orgânica).
+TIPOS_MAIORIA_ABSOLUTA = {"PLC"}
+
 
 # ------------------------------------------------------------------
 # Parlamentares e legislaturas
@@ -132,12 +162,20 @@ def votar(
     """Registra a votação e apura o resultado.
 
     - NOMINAL: exige `votos` {parlamentar_id: 'SIM'|'NAO'|'ABSTENCAO'};
-      apura por maioria simples (SIM > NAO; empate rejeita).
+      apura por maioria simples (SIM > NAO; empate rejeita). Para tipos
+      que exigem maioria absoluta (art. 178 do Regimento — PLC), a
+      aprovação requer SIM de mais da metade dos MEMBROS da Câmara
+      (contados pelos mandatos vigentes), não apenas dos presentes.
     - SIMBOLICA: exige `resultado_simbolico` ('APROVADA'|'REJEITADA'),
-      proclamado pela Presidência sem registro individual.
+      proclamado pela Presidência sem registro individual; vedada para
+      tipos que exigem maioria absoluta.
 
     Atualiza a situação da proposição e devolve o resultado.
     """
+    (tipo_proposicao,) = banco.execute(
+        "SELECT tipo FROM proposicao WHERE id = ?", (proposicao_id,)
+    ).fetchone()
+    exige_absoluta = tipo_proposicao in TIPOS_MAIORIA_ABSOLUTA
     pautada = banco.execute(
         "SELECT COUNT(*) FROM pauta_item WHERE sessao_id = ? AND "
         "proposicao_id = ?", (sessao_id, proposicao_id),
@@ -157,8 +195,19 @@ def votar(
             raise RegraViolada("votação nominal exige votos individuais")
         sim = sum(1 for valor in votos.values() if valor == "SIM")
         nao = sum(1 for valor in votos.values() if valor == "NAO")
-        resultado = "APROVADA" if sim > nao else "REJEITADA"
+        if exige_absoluta:
+            (membros,) = banco.execute(
+                "SELECT COUNT(*) FROM mandato"
+            ).fetchone()
+            resultado = "APROVADA" if sim > membros / 2 else "REJEITADA"
+        else:
+            resultado = "APROVADA" if sim > nao else "REJEITADA"
     elif modalidade == "SIMBOLICA":
+        if exige_absoluta:
+            raise RegraViolada(
+                f"{tipo_proposicao} exige votação nominal por maioria "
+                "absoluta (art. 178 do Regimento Interno)"
+            )
         if resultado_simbolico not in ("APROVADA", "REJEITADA"):
             raise RegraViolada("votação simbólica exige o resultado proclamado")
         resultado = resultado_simbolico

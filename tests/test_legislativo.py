@@ -102,6 +102,40 @@ class TestLegislativo(unittest.TestCase):
         with self.assertRaises(RegraViolada):
             legislativo.votar(self.banco, sessao, proposicao, "NOMINAL")
 
+    def _plc_pautado(self):
+        proposicao, _ = legislativo.apresentar_proposicao(
+            self.banco, "PLC", "Altera a Lei Orgânica", "2025-09-10")
+        sessao, _ = legislativo.convocar_sessao(self.banco, "ORDINARIA",
+                                                "2025-09-16")
+        legislativo.pautar(self.banco, sessao, proposicao)
+        return sessao, proposicao
+
+    def test_plc_exige_maioria_absoluta(self):
+        # 5 membros; 2 SIM × 1 NAO aprovaria por maioria simples,
+        # mas PLC exige SIM > 2,5 (art. 178 do Regimento).
+        sessao, proposicao = self._plc_pautado()
+        votos = {self.vereadores[0]: "SIM", self.vereadores[1]: "SIM",
+                 self.vereadores[2]: "NAO"}
+        self.assertEqual(
+            legislativo.votar(self.banco, sessao, proposicao, "NOMINAL", votos),
+            "REJEITADA")
+
+    def test_plc_aprovado_com_maioria_absoluta(self):
+        sessao, proposicao = self._plc_pautado()
+        votos = dict.fromkeys(self.vereadores[:3], "SIM")  # 3 de 5 membros
+        self.assertEqual(
+            legislativo.votar(self.banco, sessao, proposicao, "NOMINAL", votos),
+            "APROVADA")
+
+    def test_plc_nao_admite_votacao_simbolica(self):
+        sessao, proposicao = self._plc_pautado()
+        with self.assertRaises(RegraViolada):
+            legislativo.votar(self.banco, sessao, proposicao, "SIMBOLICA",
+                              resultado_simbolico="APROVADA")
+
+    def test_lista_de_comissoes_regimentais(self):
+        self.assertEqual(len(legislativo.COMISSOES_PERMANENTES_REGIMENTAIS), 20)
+
 
 if __name__ == "__main__":
     unittest.main()

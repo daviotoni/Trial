@@ -193,7 +193,7 @@ CREATE TABLE mandato (
 CREATE TABLE proposicao (
     id                  INTEGER PRIMARY KEY,
     tipo                TEXT NOT NULL CHECK (tipo IN
-                          ('PL', 'PDL', 'PR', 'EMENDA', 'INDICACAO',
+                          ('PL', 'PLC', 'PDL', 'PR', 'EMENDA', 'INDICACAO',
                            'REQUERIMENTO', 'MOCAO', 'VETO')),
     numero              INTEGER NOT NULL,
     ano                 INTEGER NOT NULL,

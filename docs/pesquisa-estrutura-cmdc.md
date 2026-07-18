@@ -213,28 +213,66 @@ baseline para o módulo legislativo (avaliar integrar ou substituir).
 
 ---
 
-## 5. Lacunas a resolver antes da modelagem final
+## 5. Regimento Interno — Resolução nº 1.835, de 13/07/2000
 
-1. ~~Anexos da Lei 3.525/2025~~ — **resolvido**: o Anexo I (615 vagas) foi obtido do texto
-   integral e está codificado em `orgao/cmdc.py`. O Anexo II é o organograma em imagem
-   (não capturado no texto); solicitar o arquivo gráfico à CMDC se necessário.
-2. **Regimento Interno** e **Lei Orgânica**: as versões consolidadas não puderam ser
-   verificadas nas fontes confiáveis desta rodada (as páginas do leismunicipais.com.br não
-   passaram na verificação); confirmar no site oficial os fluxos regimentais de tramitação.
-3. Plano de cargos e carreiras **efetivos** posterior a 2012 (se houver lei específica
-   atualizando o quadro de concursados) — a Lei 3.525/2025 disciplina comissionados e
-   funções gratificadas, e menciona a carreira de Técnico Legislativo (art. 8º) sem
-   reestruturá-la.
-4. Resolução da Mesa Diretora com os critérios de fixação do percentual da GAL
-   (art. 7º, parágrafo único) — necessária para parametrizar a folha.
+Localizado no [site oficial (PDF, 105 p.)](https://www.cmdc.rj.gov.br/wp-content/uploads/2013/06/Regimento_Interno_da_Camara.pdf)
+e arquivado em `docs/regimento-interno-res-1835-2000.pdf` (texto extraído no `.txt`
+correspondente). Alterado ao longo do tempo por resoluções (ex.: 1.946/2002 — voto aberto;
+2.399/2013 — comissões; 2.725/2019 — licenças, art. 252; 2.910/2025 — art. 101, §1º).
+
+Regras regimentais relevantes para o sistema:
+
+- **Comissões permanentes (art. 33)**: 20 comissões temáticas (Legislação, Justiça e
+  Redação Final; Finanças e Orçamento; Educação e Cultura; Saúde e Assistência Social;
+  Transportes; Defesa do Consumidor; Obras e Serviços Públicos; Meio Ambiente; Fiscalização;
+  Desenvolvimento Urbano; Direitos da Mulher e da Criança e Adolescente; Direitos Humanos;
+  Portadores de Necessidades Especiais; Segurança Alimentar; Segurança; Esporte, Lazer e
+  Turismo; Prevenção e Combate às Drogas; Combate à Pirataria; Direitos dos Idosos;
+  Direitos da Juventude) — distintas das comissões administrativas do art. 45 da Lei
+  3.525/2025.
+- **Sessões ordinárias** com início às 17h30 e partes definidas (art. 75); abertura exige
+  **maioria absoluta** para a ordem do dia; regras detalhadas de quórum e adiamento.
+- **Votação ostensiva** — simbólica (regra geral) ou nominal, sempre com **voto aberto**
+  (art. 180, redação da Res. 1.946/2002); verificação de votação a pedido.
+- **Maioria absoluta** para Projeto de Lei Complementar (art. 178) e outras hipóteses
+  qualificadas (deliberações de comissões exigem presença da maioria absoluta, art. — Seção
+  das Comissões).
+
+## 6. Resolução da GAL — **não existe até junho/2026**
+
+O art. 7º, parágrafo único, da Lei 3.525/2025 remete os critérios de fixação do percentual
+da GAL a Resolução da Mesa Diretora. Varredura completa das resoluções publicadas no site
+oficial entre a nº 2.910 (11/02/2025) e a nº 2.938 (30/06/2026): **nenhuma regulamenta a
+GAL** — a quase totalidade trata de títulos honoríficos. Achados correlatos para o módulo
+de RH: [Resolução 2.929/2026](https://www.cmdc.rj.gov.br/?p=31478) (controle de
+frequência/ponto dos servidores) e [Resolução 2.938/2026](https://www.cmdc.rj.gov.br/?p=32300)
+(consignações em folha). A [Lei 3.558/2025](https://www.cmdc.rj.gov.br/?p=31180) altera a
+Lei 1.506/2000 (bonificação natalina de R$ 250 em 2025, não incorporável), sem tocar a
+3.525.
+
+**Implicação prática**: desde 01/09/2025 a GAL tem teto legal (150%) mas não tem critérios
+regulamentados — no sistema, o percentual é parâmetro obrigatório do cálculo, validado
+contra o teto, ficando pronto para receber os critérios quando a Resolução for editada.
+
+## 7. Lacunas remanescentes
+
+1. ~~Anexos da Lei 3.525/2025~~ — **resolvido** (Anexo I codificado em `orgao/cmdc.py`).
+2. ~~Regimento Interno~~ — **resolvido** (Res. 1.835/2000 arquivada em `docs/`); confirmar
+   com a Secretaria se há consolidação mais recente que o PDF publicado.
+3. ~~Resolução da GAL~~ — **verificado: inexistente até jun/2026** (acompanhar edição).
+4. Plano de cargos e carreiras **efetivos** posterior a 2012.
 5. Lei nº 3.226/2022 (benefícios do art. 17, referida no art. 4º da Lei 3.525/2025).
+6. Lei Orgânica consolidada ([PDF oficial](https://www.cmdc.rj.gov.br/wp-content/uploads/2013/06/Lei_Organica_Municipal.pdf)
+   disponível; incorporar se necessário).
 
 ---
 
-## 6. Fontes primárias confirmadas
+## 8. Fontes primárias confirmadas
 
 1. [Lei nº 3.525/2025 — site oficial CMDC](https://www.cmdc.rj.gov.br/?p=30397)
 2. [Organograma CMDC 30/10/2023 (PDF oficial)](https://www.cmdc.rj.gov.br/wp-content/uploads/2023/10/organograma_30_10_2023_14_40.pdf)
 3. [Lei Municipal 1.506/2000 — Estatuto dos Servidores (IPMDC)](http://ipmdc.com.br/pdf/1506.pdf)
 4. [Edital 001/2012 do concurso da CMDC](https://cdn.direcaoconcursos.com.br/uploads/2021/02/edital-Concurso-p%C3%BAblico-Duque-de-Caxias-RJ-C%C3%A2mara.pdf)
 5. [SAPL — Interlegis/Senado Federal](https://www12.senado.leg.br/interlegis/produtos/sapl)
+6. [Regimento Interno — Res. 1.835/2000 (PDF oficial)](https://www.cmdc.rj.gov.br/wp-content/uploads/2013/06/Regimento_Interno_da_Camara.pdf)
+7. [Categoria Resoluções do site da CMDC](https://www.cmdc.rj.gov.br/?cat=9) (varredura 2.910–2.938)
