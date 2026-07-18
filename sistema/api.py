@@ -40,7 +40,7 @@ from pathlib import Path
 
 PAGINA_WEB = Path(__file__).parent / "web" / "index.html"
 
-from sistema import legislativo, servicos
+from sistema import compras, legislativo, servicos, transparencia
 from sistema.demo import criar_banco
 from sistema.servicos import RegraViolada
 
@@ -261,6 +261,59 @@ class Aplicacao:
         except RegraViolada:
             raise Recurso404
 
+    # --------------------- compras e contratos ----------------------
+
+    def cadastrar_fornecedor(self, dados):
+        fid = compras.cadastrar_fornecedor(
+            self.banco, dados["razao_social"], dados.get("cnpj"))
+        self.banco.commit()
+        return {"id": fid}
+
+    def abrir_contratacao(self, dados):
+        cid, numero = compras.abrir_contratacao(
+            self.banco, dados["modalidade"], dados["objeto"],
+            dados["valor_estimado"], dados["unidade_demandante_id"],
+            dados["data"], dados.get("categoria", "COMPRAS_OUTROS_SERVICOS"))
+        self.banco.commit()
+        return {"id": cid, "numero": numero}
+
+    def homologar_contratacao(self, contratacao_id: int, dados):
+        compras.homologar(self.banco, contratacao_id, dados["data"])
+        self.banco.commit()
+        return {"id": contratacao_id, "situacao": "HOMOLOGADA"}
+
+    def celebrar_contrato(self, dados):
+        contrato = compras.celebrar_contrato(
+            self.banco, dados["contratacao_id"], dados["fornecedor_id"],
+            dados["valor"], dados["inicio"], dados.get("fim"))
+        self.banco.commit()
+        return {"id": contrato}
+
+    def empenhar(self, dados):
+        eid, numero = compras.empenhar(
+            self.banco, dados["valor"], dados["descricao"], dados["data"],
+            dados.get("contrato_id"))
+        self.banco.commit()
+        return {"id": eid, "numero": numero}
+
+    # ------------------ transparência e controle --------------------
+
+    def publicar(self, dados):
+        pid = transparencia.publicar(
+            self.banco, dados["tipo"], dados["referencia"], dados["data"],
+            dados.get("url"))
+        self.banco.commit()
+        return {"id": pid}
+
+    def pendencias(self):
+        return transparencia.pendencias_publicacao(self.banco)
+
+    def auditoria(self):
+        return transparencia.trilha_auditoria(self.banco)
+
+    def painel(self):
+        return transparencia.painel(self.banco)
+
 
 ROTAS = [
     ("GET", r"^/organograma$", lambda app, m, d: app.organograma()),
@@ -289,6 +342,16 @@ ROTAS = [
      lambda app, m, d: app.votar(int(m.group(1)), d)),
     ("GET", r"^/sessoes/(\d+)/votacoes/(\d+)$",
      lambda app, m, d: app.placar(int(m.group(1)), int(m.group(2)))),
+    ("POST", r"^/fornecedores$", lambda app, m, d: app.cadastrar_fornecedor(d)),
+    ("POST", r"^/contratacoes$", lambda app, m, d: app.abrir_contratacao(d)),
+    ("POST", r"^/contratacoes/(\d+)/homologacao$",
+     lambda app, m, d: app.homologar_contratacao(int(m.group(1)), d)),
+    ("POST", r"^/contratos$", lambda app, m, d: app.celebrar_contrato(d)),
+    ("POST", r"^/empenhos$", lambda app, m, d: app.empenhar(d)),
+    ("POST", r"^/publicacoes$", lambda app, m, d: app.publicar(d)),
+    ("GET", r"^/transparencia/pendencias$", lambda app, m, d: app.pendencias()),
+    ("GET", r"^/auditoria$", lambda app, m, d: app.auditoria()),
+    ("GET", r"^/painel$", lambda app, m, d: app.painel()),
 ]
 
 

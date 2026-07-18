@@ -51,6 +51,10 @@
   .selo { font-size: 12px; border-radius: 10px; padding: 2px 9px; }
   .selo.APROVADA { background: #e6f4ea; color: var(--ok); }
   .selo.REJEITADA { background: #fbeaea; color: var(--erro); }
+  .indicador { flex: 1; min-width: 150px; background: #eaf1f7;
+               border-radius: 8px; padding: 12px 14px; text-align: center; }
+  .indicador .valor { font-size: 26px; font-weight: 700; color: var(--azul); }
+  .indicador .nome { font-size: 12px; color: #567; }
 </style>
 </head>
 <body>
@@ -59,14 +63,26 @@
   <small>Protótipo · Lei nº 3.525/2025 · dados de demonstração</small>
 </header>
 <nav id="menu">
-  <button data-aba="organograma" class="ativa">Organograma</button>
+  <button data-aba="painel" class="ativa">Painel</button>
+  <button data-aba="organograma">Organograma</button>
   <button data-aba="cargos">Cargos e vagas</button>
   <button data-aba="protocolo">Protocolo</button>
   <button data-aba="plenario">Plenário</button>
 </nav>
 <main>
 
-<section id="organograma" class="ativa">
+<section id="painel" class="ativa">
+  <div class="cartao">
+    <h2>Painel de gestão</h2>
+    <div id="indicadores" class="linha"></div>
+  </div>
+  <div class="cartao">
+    <h2>Pendências de publicação (transparência)</h2>
+    <div id="pendencias"></div>
+  </div>
+</section>
+
+<section id="organograma">
   <div class="cartao">
     <h2>Estrutura organizacional (Lei nº 3.525/2025)</h2>
     <p>Clique numa unidade para recolher/expandir. Graus: 1 — órgãos
@@ -165,6 +181,40 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   if (!aba) return;
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("ativa", b === evento.target));
   document.querySelectorAll("main section").forEach(s => s.classList.toggle("ativa", s.id === aba));
+});
+
+// Painel
+const NOMES_INDICADORES = {
+  unidades: "Unidades", vagas_anexo_i: "Vagas (Anexo I)",
+  provimentos_ativos: "Provimentos ativos", servidores: "Servidores",
+  processos: "Processos", processos_em_tramitacao: "Em tramitação",
+  proposicoes: "Proposições", sessoes: "Sessões", votacoes: "Votações",
+  contratacoes: "Contratações", contratos: "Contratos",
+  valor_contratado: "Valor contratado (R$)",
+  valor_empenhado: "Valor empenhado (R$)", publicacoes: "Publicações",
+  eventos_auditoria: "Eventos de auditoria",
+};
+consultar("/painel").then(numeros => {
+  const alvo = document.getElementById("indicadores");
+  Object.entries(NOMES_INDICADORES).forEach(([chave, nome]) => {
+    const caixa = document.createElement("div");
+    caixa.className = "indicador";
+    const valor = chave.startsWith("valor_")
+      ? Number(numeros[chave]).toLocaleString("pt-BR", {minimumFractionDigits: 2})
+      : numeros[chave];
+    caixa.innerHTML = `<div class="valor">${valor}</div><div class="nome">${nome}</div>`;
+    alvo.appendChild(caixa);
+  });
+});
+consultar("/transparencia/pendencias").then(pendencias => {
+  const alvo = document.getElementById("pendencias");
+  const itens = [
+    ...pendencias.contratos.map(c => `Contrato ${c.contrato_id} — ${c.objeto} (R$ ${Number(c.valor).toLocaleString("pt-BR")})`),
+    ...pendencias.folhas.map(f => `Folha da competência ${f.competencia}`),
+  ];
+  alvo.innerHTML = itens.length
+    ? "<ul>" + itens.map(i => `<li>${i}</li>`).join("") + "</ul>"
+    : "<p>Nenhuma pendência — tudo publicado.</p>";
 });
 
 // Organograma

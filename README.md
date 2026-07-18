@@ -120,8 +120,17 @@ cálculo de folha com as gratificações da lei (GAL com teto de 150%, GRAT-CC d
 `sistema/legislativo.py` cobre a atividade-fim: proposições numeradas por
 tipo/ano com autuação automática no protocolo, sessões, ordem do dia e
 votações **nominais** (voto individual, apuração por maioria simples) ou
-simbólicas — com bloqueios para matéria fora de pauta ou já votada.
+simbólicas — com bloqueios para matéria fora de pauta ou já votada, e
+**maioria absoluta** para PLC (art. 178 do Regimento Interno).
 Demonstração: `python -m sistema.legislativo`.
+
+`sistema/compras.py` implementa o fluxo da Lei 14.133/2021: abertura de
+contratação com autuação automática, limites de dispensa do art. 75,
+homologação obrigatória antes do contrato, empenhos que não excedem o valor
+contratado e trilha de auditoria em toda operação. `sistema/transparencia.py`
+fecha o ciclo: registro de publicações, **pendências de publicação**
+(contratos/folhas ainda não divulgados), trilha de auditoria consultável e o
+painel de indicadores exibido na primeira aba da interface web.
 
 A carga inicial é derivada de `orgao/cmdc.py` — as 49 unidades e as 615 vagas
 do Anexo I da Lei 3.525/2025 entram no banco sem digitação manual.
