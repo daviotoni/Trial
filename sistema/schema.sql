@@ -315,6 +315,27 @@ CREATE TABLE auditoria (
     detalhes    TEXT
 );
 
+-- ============================================================
+-- Módulo 8: Usuários e perfis de acesso
+-- ============================================================
+
+-- Perfis espelham os setores da Lei 3.525/2025:
+--   ADMIN (Diretoria-Geral/TI), RH (Coord. de Recursos Humanos),
+--   PROTOCOLO (Secretaria-Geral), LEGISLATIVO (Plenário/Apoio
+--   Legislativo), COMPRAS (Compras/Licitações), CONTROLE
+--   (Controladoria-Geral/Publicações e Transparência).
+CREATE TABLE usuario (
+    id          INTEGER PRIMARY KEY,
+    login       TEXT NOT NULL UNIQUE,
+    senha_hash  TEXT NOT NULL,             -- PBKDF2-SHA256
+    sal         TEXT NOT NULL,
+    perfil      TEXT NOT NULL CHECK (perfil IN
+                  ('ADMIN', 'RH', 'PROTOCOLO', 'LEGISLATIVO',
+                   'COMPRAS', 'CONTROLE')),
+    servidor_id INTEGER REFERENCES servidor (id),
+    ativo       INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0, 1))
+);
+
 -- Índices para as consultas mais frequentes
 CREATE INDEX idx_unidade_pai ON unidade (unidade_pai_id);
 CREATE INDEX idx_provimento_ativo ON provimento (cargo_id, data_fim);

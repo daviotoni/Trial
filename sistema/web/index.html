@@ -59,8 +59,18 @@
 </head>
 <body>
 <header>
-  <h1>Sistema de Gestão — Câmara Municipal de Duque de Caxias</h1>
-  <small>Protótipo · Lei nº 3.525/2025 · dados de demonstração</small>
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap">
+    <div>
+      <h1>Sistema de Gestão — Câmara Municipal de Duque de Caxias</h1>
+      <small>Protótipo · Lei nº 3.525/2025 · dados de demonstração</small>
+    </div>
+    <div id="area-login" style="display:flex; gap:6px; align-items:center">
+      <input id="login-usuario" placeholder="usuário" style="width:110px; margin:0">
+      <input id="login-senha" type="password" placeholder="senha" style="width:110px; margin:0">
+      <button class="acao" id="btn-login" style="padding:7px 12px">Entrar</button>
+      <span id="login-status" style="font-size:13px"></span>
+    </div>
+  </div>
 </header>
 <nav id="menu">
   <button data-aba="painel" class="ativa">Painel</button>
@@ -160,7 +170,10 @@
 
 </main>
 <script>
-const consultar = async (caminho, opcoes) => {
+const consultar = async (caminho, opcoes = {}) => {
+  const token = localStorage.getItem("token");
+  opcoes.headers = Object.assign(
+    {}, opcoes.headers, token ? {"Authorization": `Bearer ${token}`} : {});
   const resposta = await fetch(caminho, opcoes);
   const corpo = await resposta.json();
   if (!resposta.ok) throw new Error(corpo.erro || resposta.status);
@@ -170,6 +183,40 @@ const enviar = (caminho, dados) => consultar(caminho, {
   method: "POST", headers: {"Content-Type": "application/json"},
   body: JSON.stringify(dados),
 });
+
+// Login
+const mostrarStatusLogin = () => {
+  const status = document.getElementById("login-status");
+  const perfil = localStorage.getItem("perfil");
+  if (perfil) {
+    status.textContent = `${localStorage.getItem("usuario")} (${perfil})`;
+    document.getElementById("btn-login").textContent = "Sair";
+    document.getElementById("login-usuario").style.display = "none";
+    document.getElementById("login-senha").style.display = "none";
+  } else {
+    status.textContent = "";
+    document.getElementById("btn-login").textContent = "Entrar";
+    document.getElementById("login-usuario").style.display = "";
+    document.getElementById("login-senha").style.display = "";
+  }
+};
+document.getElementById("btn-login").addEventListener("click", async () => {
+  if (localStorage.getItem("perfil")) {
+    localStorage.clear(); mostrarStatusLogin(); return;
+  }
+  const usuario = document.getElementById("login-usuario").value;
+  try {
+    const sessao = await enviar("/login", {
+      login: usuario, senha: document.getElementById("login-senha").value});
+    localStorage.setItem("token", sessao.token);
+    localStorage.setItem("perfil", sessao.perfil);
+    localStorage.setItem("usuario", usuario);
+    mostrarStatusLogin();
+  } catch (erro) {
+    document.getElementById("login-status").textContent = "✗ " + erro.message;
+  }
+});
+mostrarStatusLogin();
 const mostrar = (id, texto, tipo) => {
   const alvo = document.getElementById(id);
   alvo.textContent = texto; alvo.className = "msg " + tipo;

@@ -23,7 +23,17 @@ Expõe a camada de serviços (`sistema.servicos`) por HTTP/JSON:
     POST /sessoes/{id}/votacoes           vota (nominal ou simbólica)
     GET  /sessoes/{id}/votacoes/{prop}    placar da votação
 
-Regras violadas retornam 422 com a mensagem legal; recurso ausente, 404.
+Autenticação e alçadas por setor (Lei 3.525/2025):
+    POST /login {login, senha}  →  {token, perfil}
+    POST /usuarios              cria usuário (perfil ADMIN)
+    Demais escritas exigem "Authorization: Bearer <token>" e perfil com
+    alçada na área (RH, PROTOCOLO, LEGISLATIVO, COMPRAS, CONTROLE, ADMIN).
+    Consultas de transparência ativa (organograma, cargos, painel, placar,
+    pendências) são públicas por princípio (LAI).
+
+Regras violadas retornam 422 com a mensagem legal; sem login, 401; sem
+alçada, 403; recurso ausente, 404. No primeiro uso é criado o usuário
+"admin" com a senha inicial documentada em sistema/autenticacao.py.
 
 Uso:
     python -m sistema.api               # sobe em http://127.0.0.1:8000
@@ -40,7 +50,8 @@ from pathlib import Path
 
 PAGINA_WEB = Path(__file__).parent / "web" / "index.html"
 
-from sistema import compras, legislativo, servicos, transparencia
+from sistema import autenticacao, compras, legislativo, servicos, transparencia
+from sistema.autenticacao import AcessoNegado, NaoAutenticado
 from sistema.demo import criar_banco
 from sistema.servicos import RegraViolada
 
@@ -55,6 +66,30 @@ class Aplicacao:
     def __init__(self, caminho_banco: str = ":memory:"):
         self.banco = criar_banco(caminho_banco, multithread=True)
         self.trava = threading.Lock()
+        self.sessoes = autenticacao.Sessoes()
+        self.usuario_atual: dict | None = None
+        if autenticacao.garantir_admin_inicial(self.banco):
+            self.banco.commit()
+
+    # ------------------------ autenticação --------------------------
+
+    def login(self, dados):
+        usuario = autenticacao.autenticar(
+            self.banco, dados["login"], dados["senha"])
+        if usuario is None:
+            raise NaoAutenticado("credenciais inválidas")
+        return {"token": self.sessoes.abrir(usuario),
+                "perfil": usuario["perfil"]}
+
+    def criar_usuario(self, dados):
+        try:
+            uid = autenticacao.criar_usuario(
+                self.banco, dados["login"], dados["senha"], dados["perfil"],
+                dados.get("servidor_id"))
+        except ValueError as erro:
+            raise RegraViolada(str(erro))
+        self.banco.commit()
+        return {"id": uid}
 
     # -------------------------- consultas --------------------------
 
@@ -269,30 +304,36 @@ class Aplicacao:
         self.banco.commit()
         return {"id": fid}
 
+    def _operador(self) -> str:
+        return self.usuario_atual["login"] if self.usuario_atual else "sistema"
+
     def abrir_contratacao(self, dados):
         cid, numero = compras.abrir_contratacao(
             self.banco, dados["modalidade"], dados["objeto"],
             dados["valor_estimado"], dados["unidade_demandante_id"],
-            dados["data"], dados.get("categoria", "COMPRAS_OUTROS_SERVICOS"))
+            dados["data"], dados.get("categoria", "COMPRAS_OUTROS_SERVICOS"),
+            usuario=self._operador())
         self.banco.commit()
         return {"id": cid, "numero": numero}
 
     def homologar_contratacao(self, contratacao_id: int, dados):
-        compras.homologar(self.banco, contratacao_id, dados["data"])
+        compras.homologar(self.banco, contratacao_id, dados["data"],
+                          usuario=self._operador())
         self.banco.commit()
         return {"id": contratacao_id, "situacao": "HOMOLOGADA"}
 
     def celebrar_contrato(self, dados):
         contrato = compras.celebrar_contrato(
             self.banco, dados["contratacao_id"], dados["fornecedor_id"],
-            dados["valor"], dados["inicio"], dados.get("fim"))
+            dados["valor"], dados["inicio"], dados.get("fim"),
+            usuario=self._operador())
         self.banco.commit()
         return {"id": contrato}
 
     def empenhar(self, dados):
         eid, numero = compras.empenhar(
             self.banco, dados["valor"], dados["descricao"], dados["data"],
-            dados.get("contrato_id"))
+            dados.get("contrato_id"), usuario=self._operador())
         self.banco.commit()
         return {"id": eid, "numero": numero}
 
@@ -315,43 +356,53 @@ class Aplicacao:
         return transparencia.painel(self.banco)
 
 
+# (método, padrão, área exigida, ação). Área None = rota pública —
+# consultas de transparência ativa são abertas por princípio (LAI).
 ROTAS = [
-    ("GET", r"^/organograma$", lambda app, m, d: app.organograma()),
-    ("GET", r"^/unidades$", lambda app, m, d: app.unidades()),
-    ("GET", r"^/cargos$", lambda app, m, d: app.cargos()),
-    ("GET", r"^/servidores$", lambda app, m, d: app.servidores()),
-    ("POST", r"^/servidores$", lambda app, m, d: app.criar_servidor(d)),
-    ("POST", r"^/provimentos$", lambda app, m, d: app.nomear(d)),
-    ("POST", r"^/provimentos/(\d+)/exoneracao$",
+    ("POST", r"^/login$", None, lambda app, m, d: app.login(d)),
+    ("POST", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.criar_usuario(d)),
+    ("GET", r"^/organograma$", None, lambda app, m, d: app.organograma()),
+    ("GET", r"^/unidades$", None, lambda app, m, d: app.unidades()),
+    ("GET", r"^/cargos$", None, lambda app, m, d: app.cargos()),
+    ("GET", r"^/servidores$", "PESSOAL", lambda app, m, d: app.servidores()),
+    ("POST", r"^/servidores$", "PESSOAL", lambda app, m, d: app.criar_servidor(d)),
+    ("POST", r"^/provimentos$", "PESSOAL", lambda app, m, d: app.nomear(d)),
+    ("POST", r"^/provimentos/(\d+)/exoneracao$", "PESSOAL",
      lambda app, m, d: app.exonerar(int(m.group(1)), d)),
-    ("POST", r"^/processos$", lambda app, m, d: app.autuar(d)),
-    ("GET", r"^/processos/(\d+)$",
+    ("POST", r"^/processos$", "PROTOCOLO", lambda app, m, d: app.autuar(d)),
+    ("GET", r"^/processos/(\d+)$", None,
      lambda app, m, d: app.processo(int(m.group(1)))),
-    ("POST", r"^/processos/(\d+)/tramitacoes$",
+    ("POST", r"^/processos/(\d+)/tramitacoes$", "PROTOCOLO",
      lambda app, m, d: app.tramitar(int(m.group(1)), d)),
-    ("POST", r"^/folhas$", lambda app, m, d: app.calcular_folha(d)),
-    ("GET", r"^/folhas/(\d+)$", lambda app, m, d: app.folha(int(m.group(1)))),
-    ("GET", r"^/parlamentares$", lambda app, m, d: app.parlamentares()),
-    ("POST", r"^/parlamentares$", lambda app, m, d: app.empossar(d)),
-    ("POST", r"^/legislaturas$", lambda app, m, d: app.criar_legislatura(d)),
-    ("POST", r"^/proposicoes$", lambda app, m, d: app.apresentar_proposicao(d)),
-    ("POST", r"^/sessoes$", lambda app, m, d: app.convocar_sessao(d)),
-    ("POST", r"^/sessoes/(\d+)/pauta$",
+    ("POST", r"^/folhas$", "FOLHA", lambda app, m, d: app.calcular_folha(d)),
+    ("GET", r"^/folhas/(\d+)$", "FOLHA",
+     lambda app, m, d: app.folha(int(m.group(1)))),
+    ("GET", r"^/parlamentares$", None, lambda app, m, d: app.parlamentares()),
+    ("POST", r"^/parlamentares$", "LEGISLATIVO", lambda app, m, d: app.empossar(d)),
+    ("POST", r"^/legislaturas$", "LEGISLATIVO",
+     lambda app, m, d: app.criar_legislatura(d)),
+    ("POST", r"^/proposicoes$", "LEGISLATIVO",
+     lambda app, m, d: app.apresentar_proposicao(d)),
+    ("POST", r"^/sessoes$", "LEGISLATIVO", lambda app, m, d: app.convocar_sessao(d)),
+    ("POST", r"^/sessoes/(\d+)/pauta$", "LEGISLATIVO",
      lambda app, m, d: app.pautar(int(m.group(1)), d)),
-    ("POST", r"^/sessoes/(\d+)/votacoes$",
+    ("POST", r"^/sessoes/(\d+)/votacoes$", "LEGISLATIVO",
      lambda app, m, d: app.votar(int(m.group(1)), d)),
-    ("GET", r"^/sessoes/(\d+)/votacoes/(\d+)$",
+    ("GET", r"^/sessoes/(\d+)/votacoes/(\d+)$", None,
      lambda app, m, d: app.placar(int(m.group(1)), int(m.group(2)))),
-    ("POST", r"^/fornecedores$", lambda app, m, d: app.cadastrar_fornecedor(d)),
-    ("POST", r"^/contratacoes$", lambda app, m, d: app.abrir_contratacao(d)),
-    ("POST", r"^/contratacoes/(\d+)/homologacao$",
+    ("POST", r"^/fornecedores$", "COMPRAS",
+     lambda app, m, d: app.cadastrar_fornecedor(d)),
+    ("POST", r"^/contratacoes$", "COMPRAS",
+     lambda app, m, d: app.abrir_contratacao(d)),
+    ("POST", r"^/contratacoes/(\d+)/homologacao$", "COMPRAS",
      lambda app, m, d: app.homologar_contratacao(int(m.group(1)), d)),
-    ("POST", r"^/contratos$", lambda app, m, d: app.celebrar_contrato(d)),
-    ("POST", r"^/empenhos$", lambda app, m, d: app.empenhar(d)),
-    ("POST", r"^/publicacoes$", lambda app, m, d: app.publicar(d)),
-    ("GET", r"^/transparencia/pendencias$", lambda app, m, d: app.pendencias()),
-    ("GET", r"^/auditoria$", lambda app, m, d: app.auditoria()),
-    ("GET", r"^/painel$", lambda app, m, d: app.painel()),
+    ("POST", r"^/contratos$", "COMPRAS", lambda app, m, d: app.celebrar_contrato(d)),
+    ("POST", r"^/empenhos$", "COMPRAS", lambda app, m, d: app.empenhar(d)),
+    ("POST", r"^/publicacoes$", "TRANSPARENCIA", lambda app, m, d: app.publicar(d)),
+    ("GET", r"^/transparencia/pendencias$", None,
+     lambda app, m, d: app.pendencias()),
+    ("GET", r"^/auditoria$", "CONTROLE", lambda app, m, d: app.auditoria()),
+    ("GET", r"^/painel$", None, lambda app, m, d: app.painel()),
 ]
 
 
@@ -375,14 +426,24 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:"):
                     corpo = json.loads(self.rfile.read(tamanho))
                 except json.JSONDecodeError:
                     return self._responder(400, {"erro": "JSON inválido"})
-            for verbo, padrao, acao in ROTAS:
+            autorizacao = self.headers.get("Authorization", "")
+            token = autorizacao.removeprefix("Bearer ").strip() or None
+            for verbo, padrao, area, acao in ROTAS:
                 if verbo != metodo:
                     continue
                 m = re.match(padrao, self.path.split("?")[0])
                 if m:
                     try:
                         with aplicacao.trava:
+                            usuario = aplicacao.sessoes.usuario(token)
+                            if area is not None:
+                                autenticacao.exigir(usuario, area)
+                            aplicacao.usuario_atual = usuario
                             return self._responder(200, acao(aplicacao, m, corpo))
+                    except NaoAutenticado as erro:
+                        return self._responder(401, {"erro": str(erro)})
+                    except AcessoNegado as erro:
+                        return self._responder(403, {"erro": str(erro)})
                     except RegraViolada as erro:
                         aplicacao.banco.rollback()
                         return self._responder(422, {"erro": str(erro)})
@@ -427,7 +488,9 @@ def main() -> None:
 
     servidor = criar_servidor_http(argumentos.porta, argumentos.banco)
     print(f"API do sistema CMDC em http://127.0.0.1:{argumentos.porta}")
-    print("Rotas:", ", ".join(sorted({f"{v} {p}" for v, p, _ in ROTAS})))
+    print("Login inicial: admin /", autenticacao.SENHA_INICIAL_ADMIN,
+          "(troque criando novos usuários via POST /usuarios)")
+    print("Rotas:", ", ".join(sorted({f"{v} {p}" for v, p, _, _ in ROTAS})))
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

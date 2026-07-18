@@ -9,11 +9,18 @@ import urllib.request
 from sistema.api import criar_servidor_http
 
 
-def requisitar(base, metodo, caminho, corpo=None):
+TOKEN_PADRAO = None  # definido no setUpClass (login como admin)
+
+
+def requisitar(base, metodo, caminho, corpo=None, token=None):
+    """token=None usa o token padrão (admin); token=False envia sem token."""
     dados = json.dumps(corpo).encode() if corpo is not None else None
+    cabecalhos = {"Content-Type": "application/json"}
+    efetivo = TOKEN_PADRAO if token is None else (token or None)
+    if efetivo:
+        cabecalhos["Authorization"] = f"Bearer {efetivo}"
     requisicao = urllib.request.Request(
-        base + caminho, data=dados, method=metodo,
-        headers={"Content-Type": "application/json"},
+        base + caminho, data=dados, method=metodo, headers=cabecalhos,
     )
     try:
         with urllib.request.urlopen(requisicao) as resposta:
@@ -30,6 +37,11 @@ class TestAPI(unittest.TestCase):
         cls.thread = threading.Thread(target=cls.servidor.serve_forever,
                                       daemon=True)
         cls.thread.start()
+        global TOKEN_PADRAO
+        _, sessao = requisitar(cls.base, "POST", "/login",
+                               {"login": "admin", "senha": "cmdc@2026"},
+                               token=False)
+        TOKEN_PADRAO = sessao["token"]
 
     @classmethod
     def tearDownClass(cls):
@@ -180,6 +192,58 @@ class TestAPI(unittest.TestCase):
             {"proposicao_id": proposicao["id"], "modalidade": "SIMBOLICA",
              "resultado_simbolico": "APROVADA"})
         self.assertEqual(codigo, 422)
+
+    def test_escrita_sem_login_retorna_401(self):
+        codigo, erro = requisitar(self.base, "POST", "/processos", {
+            "tipo": "ADMINISTRATIVO", "assunto": "X",
+            "unidade_origem_id": 1, "data_autuacao": "2026-01-01",
+        }, token=False)
+        self.assertEqual(codigo, 401)
+        self.assertIn("login", erro["erro"])
+
+    def test_login_invalido(self):
+        codigo, _ = requisitar(self.base, "POST", "/login",
+                               {"login": "admin", "senha": "errada"},
+                               token=False)
+        self.assertEqual(codigo, 401)
+
+    def test_perfil_sem_alcada_retorna_403(self):
+        # Admin cria usuário do Protocolo; ele não pode operar Compras.
+        codigo, _ = requisitar(self.base, "POST", "/usuarios", {
+            "login": "maria.protocolo", "senha": "senha-forte",
+            "perfil": "PROTOCOLO"})
+        self.assertEqual(codigo, 200)
+        _, sessao = requisitar(self.base, "POST", "/login",
+                               {"login": "maria.protocolo",
+                                "senha": "senha-forte"}, token=False)
+        codigo, erro = requisitar(self.base, "POST", "/fornecedores",
+                                  {"razao_social": "X"},
+                                  token=sessao["token"])
+        self.assertEqual(codigo, 403)
+        self.assertIn("PROTOCOLO", erro["erro"])
+        # Mas pode autuar processo (área dele) — e a autuação funciona.
+        codigo, _ = requisitar(self.base, "POST", "/processos", {
+            "tipo": "ADMINISTRATIVO", "assunto": "Da alçada do protocolo",
+            "unidade_origem_id": 1, "data_autuacao": "2026-01-02",
+        }, token=sessao["token"])
+        self.assertEqual(codigo, 200)
+
+    def test_auditoria_registra_login_do_operador(self):
+        codigo, _ = requisitar(self.base, "POST", "/contratacoes", {
+            "modalidade": "PREGAO", "objeto": "Auditar operador",
+            "valor_estimado": 1000, "unidade_demandante_id": 1,
+            "data": "2026-01-03"})
+        self.assertEqual(codigo, 200)
+        codigo, trilha = requisitar(self.base, "GET", "/auditoria")
+        self.assertEqual(codigo, 200)
+        self.assertEqual(trilha[0]["usuario"], "admin")
+
+    def test_consultas_publicas_sem_login(self):
+        for rota in ("/organograma", "/cargos", "/painel",
+                     "/transparencia/pendencias"):
+            self.assertEqual(
+                requisitar(self.base, "GET", rota, token=False)[0], 200,
+                f"rota pública falhou: {rota}")
 
 
 if __name__ == "__main__":

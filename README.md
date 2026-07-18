@@ -97,6 +97,17 @@ python -m sistema.api       # API REST em http://127.0.0.1:8000 (banco cmdc.db)
 python -m sistema.gerar_seed > sistema/seed.sql   # regenera a carga inicial
 ```
 
+**Autenticação e alçadas por setor**: `POST /login` devolve um token
+(`Authorization: Bearer`); cada perfil opera só a sua área — `RH`
+(pessoal/folha), `PROTOCOLO`, `LEGISLATIVO`, `COMPRAS`, `CONTROLE`
+(auditoria/transparência/folha) e `ADMIN` (tudo, cria usuários via
+`POST /usuarios`). Senhas com PBKDF2; primeiro acesso: usuário `admin`
+com a senha inicial documentada em `sistema/autenticacao.py` (troque-a).
+Consultas de transparência ativa (organograma, cargos, painel, placar,
+pendências) permanecem públicas, por princípio da LAI. Sem login → 401;
+sem alçada → 403 (ex.: perfil PROTOCOLO tentando cadastrar fornecedor).
+A trilha de auditoria registra o login de quem fez cada operação.
+
 A API (`sistema/api.py`, biblioteca padrão, sem dependências) expõe
 organograma, unidades, cargos com vagas disponíveis, servidores, nomeações,
 processos/tramitações, plenário e cálculo de folha — e serve em `/` a
