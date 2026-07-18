@@ -138,5 +138,10 @@ INSERT INTO rubrica (codigo, descricao, natureza, base_legal, percentual_max, in
   ('REP-JUD', 'Adicional de Representação Judiciária', 'ADICIONAL', 'Lei 3.525/2025, art. 10', 40, 0),
   ('GRAT-COM', 'Gratificação de comissão (indenizatória, não incorporável)', 'GRATIFICACAO', 'Lei 3.525/2025, arts. 46-47', 40, 0),
   ('GRAT-CC', 'Gratificação de efetivo nomeado em cargo em comissão', 'GRATIFICACAO', 'Lei 3.525/2025, art. 3º, §4º', 100, 0),
-  ('ATS', 'Adicional por tempo de serviço (triênio)', 'ADICIONAL', 'Lei 3.525/2025, art. 6º, §2º, III', NULL, 1);
+  ('ATS', 'Adicional por tempo de serviço (triênio)', 'ADICIONAL', 'Lei 3.525/2025, art. 6º, §2º, III', NULL, 1),
+  ('AD-PROD', 'Adicional de Produtividade (por conceito da avaliação)', 'ADICIONAL', 'Lei 3.226/2022, art. 14', 70, 0),
+  ('IND-GAB', 'Indenização de Representação de Gabinete Avançado', 'ADICIONAL', 'Lei 3.226/2022, art. 13', 70, 0),
+  ('AUX-ALIM', 'Auxílio-alimentação (valor fixado por ato do Presidente)', 'ADICIONAL', 'Lei 3.226/2022, art. 17; Lei 3.525/2025, art. 4º', NULL, 0),
+  ('AUX-REF', 'Auxílio-refeição (valor fixado por ato do Presidente)', 'ADICIONAL', 'Lei 3.226/2022, art. 17; Lei 3.525/2025, art. 4º', NULL, 0),
+  ('AUX-LOC', 'Auxílio-locomoção (valor fixado por ato do Presidente)', 'ADICIONAL', 'Lei 3.226/2022, art. 17; Lei 3.525/2025, art. 4º', NULL, 0);
 

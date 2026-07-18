@@ -110,6 +110,35 @@ class TestFolha(unittest.TestCase):
         with self.assertRaises(RegraViolada):
             servicos.calcular_folha(self.banco, "2025-09", percentual_gal=200)
 
+    def test_avaliacao_de_desempenho_e_produtividade(self):
+        # Paulo Sales (efetivo, Técnico Legislativo, venc. 5.200) avaliado
+        # com 92 pontos → EXCELENTE → AD-PROD de 70% (Lei 3.226/2022).
+        (sid,) = self.banco.execute(
+            "SELECT id FROM servidor WHERE nome = 'Paulo Sales'").fetchone()
+        conceito = servicos.avaliar_desempenho(
+            self.banco, sid, "2025-S2", 92, "Chefia", "2025-08-30")
+        self.assertEqual(conceito, "EXCELENTE")
+        folha = servicos.calcular_folha(self.banco, "2025-09",
+                                        percentual_gal=100)
+        self.assertEqual(self._valor(folha, "Paulo Sales", "AD-PROD"), 3640.0)
+
+    def test_avaliacao_exige_efetivo(self):
+        (sid,) = self.banco.execute(
+            "SELECT id FROM servidor WHERE nome = 'Marcos Vidal'").fetchone()
+        with self.assertRaises(RegraViolada):
+            servicos.avaliar_desempenho(self.banco, sid, "2025-S2", 90,
+                                        "Chefia", "2025-08-30")
+
+    def test_faixas_de_conceito(self):
+        self.assertEqual(servicos.conceito_por_pontuacao(95),
+                         ("EXCELENTE", 70))
+        self.assertEqual(servicos.conceito_por_pontuacao(85),
+                         ("MUITO_BOM", 50))
+        self.assertEqual(servicos.conceito_por_pontuacao(75), ("BOM", 40))
+        self.assertEqual(servicos.conceito_por_pontuacao(60), ("REGULAR", 20))
+        self.assertEqual(servicos.conceito_por_pontuacao(30),
+                         ("INSATISFATORIO", 0))
+
     def test_folha_do_cenario(self):
         folha = servicos.calcular_folha(self.banco, "2025-09", percentual_gal=100)
         # Comissionado puro: VENC pelo símbolo DAS-8 + GAL.

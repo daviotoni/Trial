@@ -110,6 +110,21 @@ CREATE TABLE designacao_comissao (
     data_fim            TEXT
 );
 
+-- Avaliação de desempenho semestral dos efetivos (Lei 3.226/2022).
+-- O conceito determina o Adicional de Produtividade do art. 14.
+CREATE TABLE avaliacao_desempenho (
+    id          INTEGER PRIMARY KEY,
+    servidor_id INTEGER NOT NULL REFERENCES servidor (id),
+    periodo     TEXT NOT NULL,             -- "2025-S2" (semestre)
+    pontuacao   INTEGER NOT NULL CHECK (pontuacao BETWEEN 0 AND 100),
+    conceito    TEXT NOT NULL CHECK (conceito IN
+                  ('EXCELENTE', 'MUITO_BOM', 'BOM', 'REGULAR',
+                   'INSATISFATORIO')),
+    avaliador   TEXT NOT NULL,             -- chefia imediata (art. 4º)
+    data        TEXT NOT NULL,
+    UNIQUE (servidor_id, periodo)
+);
+
 CREATE TABLE folha (
     id           INTEGER PRIMARY KEY,
     competencia  TEXT NOT NULL UNIQUE,     -- "2025-09"

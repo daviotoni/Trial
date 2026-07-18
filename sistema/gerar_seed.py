@@ -41,6 +41,16 @@ RUBRICAS = [
      "GRATIFICACAO", "Lei 3.525/2025, art. 3º, §4º", 100, 0),
     ("ATS", "Adicional por tempo de serviço (triênio)", "ADICIONAL",
      "Lei 3.525/2025, art. 6º, §2º, III", None, 1),
+    ("AD-PROD", "Adicional de Produtividade (por conceito da avaliação)",
+     "ADICIONAL", "Lei 3.226/2022, art. 14", 70, 0),
+    ("IND-GAB", "Indenização de Representação de Gabinete Avançado",
+     "ADICIONAL", "Lei 3.226/2022, art. 13", 70, 0),
+    ("AUX-ALIM", "Auxílio-alimentação (valor fixado por ato do Presidente)",
+     "ADICIONAL", "Lei 3.226/2022, art. 17; Lei 3.525/2025, art. 4º", None, 0),
+    ("AUX-REF", "Auxílio-refeição (valor fixado por ato do Presidente)",
+     "ADICIONAL", "Lei 3.226/2022, art. 17; Lei 3.525/2025, art. 4º", None, 0),
+    ("AUX-LOC", "Auxílio-locomoção (valor fixado por ato do Presidente)",
+     "ADICIONAL", "Lei 3.226/2022, art. 17; Lei 3.525/2025, art. 4º", None, 0),
 ]
 
 

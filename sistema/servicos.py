@@ -104,6 +104,57 @@ def exonerar(banco: sqlite3.Connection, provimento_id: int, data_fim: str) -> No
 
 
 # ------------------------------------------------------------------
+# Avaliação de desempenho (Lei 3.226/2022)
+# ------------------------------------------------------------------
+
+# Conceito por faixa de pontuação (Lei 3.226/2022) e percentual do
+# Adicional de Produtividade correspondente (art. 14).
+_CONCEITOS = [  # (pontuação mínima, conceito, % produtividade)
+    (91, "EXCELENTE", 70),
+    (81, "MUITO_BOM", 50),
+    (71, "BOM", 40),
+    (50, "REGULAR", 20),
+    (0, "INSATISFATORIO", 0),
+]
+
+
+def conceito_por_pontuacao(pontuacao: int) -> tuple[str, int]:
+    """Devolve (conceito, % do Adicional de Produtividade)."""
+    for minimo, conceito, percentual in _CONCEITOS:
+        if pontuacao >= minimo:
+            return conceito, percentual
+    raise RegraViolada("pontuação inválida")
+
+
+def avaliar_desempenho(
+    banco: sqlite3.Connection,
+    servidor_id: int,
+    periodo: str,
+    pontuacao: int,
+    avaliador: str,
+    data: str,
+) -> str:
+    """Registra a avaliação semestral de um efetivo. Devolve o conceito."""
+    if not 0 <= pontuacao <= 100:
+        raise RegraViolada("pontuação deve estar entre 0 e 100")
+    (vinculo,) = banco.execute(
+        "SELECT vinculo FROM servidor WHERE id = ?", (servidor_id,)
+    ).fetchone()
+    if vinculo != "EFETIVO":
+        raise RegraViolada(
+            "avaliação de desempenho aplica-se a servidores efetivos "
+            "(Lei 3.226/2022)"
+        )
+    conceito, _ = conceito_por_pontuacao(pontuacao)
+    banco.execute(
+        "INSERT INTO avaliacao_desempenho (servidor_id, periodo, pontuacao, "
+        "conceito, avaliador, data) VALUES (?, ?, ?, ?, ?, ?)",
+        (servidor_id, periodo, pontuacao, conceito, avaliador, data),
+    )
+    return conceito
+
+
+# ------------------------------------------------------------------
 # Protocolo e tramitação
 # ------------------------------------------------------------------
 
@@ -245,6 +296,17 @@ def calcular_folha(
                 lancar(servidor_id, "GAP", venc_efetivo, _teto(banco, "GAP"))
             if "Consultor Jurídico" in denominacao:
                 lancar(servidor_id, "REP-JUD", venc_efetivo, _teto(banco, "REP-JUD"))
+            # Adicional de Produtividade pela última avaliação de
+            # desempenho (Lei 3.226/2022, art. 14).
+            avaliacao = banco.execute(
+                "SELECT pontuacao FROM avaliacao_desempenho "
+                "WHERE servidor_id = ? ORDER BY periodo DESC LIMIT 1",
+                (servidor_id,),
+            ).fetchone()
+            if avaliacao:
+                _, percentual = conceito_por_pontuacao(avaliacao[0])
+                if percentual:
+                    lancar(servidor_id, "AD-PROD", venc_efetivo, percentual)
 
     # GRAT-COM por designação ativa (uma por servidor, mesmo em várias comissões).
     designados = banco.execute(

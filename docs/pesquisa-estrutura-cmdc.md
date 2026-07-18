@@ -254,20 +254,52 @@ Lei 1.506/2000 (bonificação natalina de R$ 250 em 2025, não incorporável), s
 regulamentados — no sistema, o percentual é parâmetro obrigatório do cálculo, validado
 contra o teto, ficando pronto para receber os critérios quando a Resolução for editada.
 
-## 7. Lacunas remanescentes
+## 7. Lei nº 3.226/2022 — avaliação de desempenho e benefícios dos efetivos
+
+Localizada: [Lei nº 3.226, de 15/03/2022](https://www.cmdc.rj.gov.br/?p=23720)
+("Dispõe sobre a Avaliação de Desempenho dos servidores efetivos da Câmara Municipal").
+Regras que o módulo de RH/folha precisa implementar:
+
+- **Avaliação semestral** pela chefia imediata (arts. 3º-4º), com 10 critérios (qualidade,
+  produtividade, iniciativa, presteza, assiduidade, pontualidade, administração do tempo,
+  uso de equipamentos, racionalização, trabalho em equipe).
+- **Conceitos por pontuação**: Excelente 91–100; Muito bom 81–90; Bom 71–80; Regular
+  50–70; Insatisfatório < 50. Conceitos bom ou superiores contam como satisfatórios para
+  o desenvolvimento na carreira (art. 7º, §1º).
+- **Adicional de Produtividade (art. 14)**, calculado sobre os vencimentos conforme o
+  conceito: 70% (excelente), 50% (muito bom), 40% (bom), 20% (regular).
+- **Indenização de Representação de Gabinete Avançado (art. 13)**: até 70% do vencimento.
+- **Art. 17** (referido pelo art. 4º da Lei 3.525/2025): autoriza pagamento em pecúnia ou
+  cartão dos **auxílios alimentação, refeição e locomoção**, regulamentados por ato do
+  Presidente — a Lei 3.525 permite ao Presidente estender esses benefícios a comissionados.
+
+## 8. Plano de carreira dos efetivos — não há lei própria pós-2012
+
+Varredura sem resultado para plano de cargos específico da **Câmara** após 2012: os planos
+encontrados são de entidades da Prefeitura ([IPMDC — Lei 2.198/2008](https://www.cmdc.rj.gov.br/?p=1078),
+[Guarda Municipal — Lei 2.725/2015](https://www.cmdc.rj.gov.br/?p=7874), revista pela
+[Lei 3.487/2025](https://www.cmdc.rj.gov.br/?p=29707), e [Educação — Lei 3.507/2025](https://www.cmdc.rj.gov.br/?p=30001)).
+O quadro efetivo da CMDC permanece o da **Resolução nº 2.379/2011** (que autorizou o
+concurso de 2012, 57 vagas e 14 cargos), regido pelo Estatuto (Lei 1.506/2000) e pela
+Lei 3.226/2022 (avaliação/produtividade). Confirmar com a Coordenadoria de RH se há
+resolução interna posterior não publicada no site.
+
+## 9. Lacunas remanescentes
 
 1. ~~Anexos da Lei 3.525/2025~~ — **resolvido** (Anexo I codificado em `orgao/cmdc.py`).
 2. ~~Regimento Interno~~ — **resolvido** (Res. 1.835/2000 arquivada em `docs/`); confirmar
    com a Secretaria se há consolidação mais recente que o PDF publicado.
 3. ~~Resolução da GAL~~ — **verificado: inexistente até jun/2026** (acompanhar edição).
-4. Plano de cargos e carreiras **efetivos** posterior a 2012.
-5. Lei nº 3.226/2022 (benefícios do art. 17, referida no art. 4º da Lei 3.525/2025).
-6. Lei Orgânica consolidada ([PDF oficial](https://www.cmdc.rj.gov.br/wp-content/uploads/2013/06/Lei_Organica_Municipal.pdf)
+4. ~~Lei nº 3.226/2022~~ — **resolvido** (seção 7; regras codificadas no sistema).
+5. ~~Plano de carreira dos efetivos~~ — **verificado: não há lei própria pós-2012**
+   (seção 8); texto integral da Resolução 2.379/2011 pode ser pedido ao RH.
+6. Atos do Presidente que fixam os VALORES dos auxílios do art. 17 (não publicados no site).
+7. Lei Orgânica consolidada ([PDF oficial](https://www.cmdc.rj.gov.br/wp-content/uploads/2013/06/Lei_Organica_Municipal.pdf)
    disponível; incorporar se necessário).
 
 ---
 
-## 8. Fontes primárias confirmadas
+## 10. Fontes primárias confirmadas
 
 1. [Lei nº 3.525/2025 — site oficial CMDC](https://www.cmdc.rj.gov.br/?p=30397)
 2. [Organograma CMDC 30/10/2023 (PDF oficial)](https://www.cmdc.rj.gov.br/wp-content/uploads/2023/10/organograma_30_10_2023_14_40.pdf)
@@ -276,3 +308,5 @@ contra o teto, ficando pronto para receber os critérios quando a Resolução fo
 5. [SAPL — Interlegis/Senado Federal](https://www12.senado.leg.br/interlegis/produtos/sapl)
 6. [Regimento Interno — Res. 1.835/2000 (PDF oficial)](https://www.cmdc.rj.gov.br/wp-content/uploads/2013/06/Regimento_Interno_da_Camara.pdf)
 7. [Categoria Resoluções do site da CMDC](https://www.cmdc.rj.gov.br/?cat=9) (varredura 2.910–2.938)
+8. [Lei nº 3.226/2022 — avaliação de desempenho (site oficial)](https://www.cmdc.rj.gov.br/?p=23720)
+9. [Lei nº 3.558/2025 — altera o Estatuto (site oficial)](https://www.cmdc.rj.gov.br/?p=31180)
