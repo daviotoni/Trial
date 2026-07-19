@@ -80,14 +80,11 @@ UNIDADE_AREAS = {
     "Assessores Parlamentares": ["LEGISLATIVO"],
     "Assessoria Especial da Presidência": ["ADMINISTRACAO"],
     "Assessoria de Gabinete Parlamentar": ["LEGISLATIVO"],
-    # Serviços auxiliares (4º grau)
-    "Limpeza": ["SERVICOS"],
-    "Manutenção Predial": ["SERVICOS"],
-    "Reprografia": ["SERVICOS"],
-    "Serviços de Copa": ["SERVICOS"],
-    "Telefonia": ["SERVICOS"],
-    "Transporte": ["SERVICOS"],
-    "Vigilância Patrimonial": ["SEGURANCA"],
+    # Os serviços auxiliares operacionais de 4º grau (copa, limpeza,
+    # reprografia, telefonia, transporte, manutenção predial, vigilância)
+    # NÃO são setores com login próprio: são operados sob a coordenadoria
+    # responsável (art. 29, 32, etc.). Só o Departamento do e-Social, que
+    # tem artigo próprio (art. 48), é setor com atividade (FOLHA).
     # Comissões permanentes administrativas (art. 45)
     "Comissão Permanente de Aplicação de Sanções": ["COMPRAS"],
     "Comissão Permanente de Atualização e Consolidação de Leis e Normas "

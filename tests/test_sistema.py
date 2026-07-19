@@ -18,13 +18,21 @@ class TestBancoSistema(unittest.TestCase):
         return self.banco.execute(sql).fetchone()[0]
 
     def test_todo_setor_tem_atividade(self):
-        # Invariante do modelo: cada setor (unidade) tem ao menos uma
-        # atividade/área mapeada — exceto o nó agrupador dos gabinetes.
+        # Invariante do modelo: cada setor com login próprio tem ao menos
+        # uma atividade/área. Não são setores com login: o nó agrupador dos
+        # gabinetes e os serviços auxiliares operacionais de 4º grau (copa,
+        # limpeza, etc.), operados sob a coordenadoria responsável — exceto
+        # o Departamento do e-Social, que tem artigo próprio.
+        from orgao.cmdc import SERVICOS_AUXILIARES
+        operacionais = [s for s in SERVICOS_AUXILIARES
+                        if s != "Departamento do e-Social"]
+        excluidos = tuple(["Gabinetes de Vereadores"] + operacionais)
+        marcadores = ",".join("?" * len(excluidos))
         sem_area = self.banco.execute(
-            """SELECT nome FROM unidade u
-                WHERE u.nome <> 'Gabinetes de Vereadores'
+            f"""SELECT nome FROM unidade u
+                WHERE u.nome NOT IN ({marcadores})
                   AND NOT EXISTS (SELECT 1 FROM unidade_area a
-                                   WHERE a.unidade_id = u.id)"""
+                                   WHERE a.unidade_id = u.id)""", excluidos
         ).fetchall()
         self.assertEqual(sem_area, [], f"setores sem atividade: {sem_area}")
 
