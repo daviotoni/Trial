@@ -38,11 +38,9 @@ erDiagram
     proposicao ||--o{ votacao : objeto
     votacao ||--o{ voto : registra
     parlamentar ||--o{ voto : vota
-    proposicao ||--o{ relatoria : distribuida
-    comissao_permanente ||--o{ relatoria : instrui
-    parlamentar ||--o{ relatoria : relata
-    relatoria ||--o{ parecer : conclui
-    proposicao ||--o{ parecer : opina
+    proposicao ||--o{ parecer : recebe
+    comissao_permanente ||--o{ parecer : "marca (classifica)"
+    parlamentar |o--o{ parecer : "relata (opcional)"
     processo |o--o{ contratacao : instrui
     contratacao ||--o{ contrato : gera
     fornecedor ||--o{ contrato : contratado
@@ -107,16 +105,18 @@ autuado, pautadas em sessões, votadas de forma simbólica ou **nominal** (voto
 individual por parlamentar). Compatível com os fluxos do SAPL/Interlegis,
 permitindo integração futura.
 
-### 5b. Comissões, relatoria e pareceres (`comissao_permanente`, `relatoria`, `parecer`)
+### 5b. Setor de comissões e pareceres (`comissao_permanente`, `parecer`)
 
-Instrução da matéria nas comissões permanentes temáticas antes da
-deliberação em Plenário (art. 33 e segs. do Regimento Interno). A
-`relatoria` designa um relator (parlamentar) para a proposição numa
-comissão, com prazo regimental; o `parecer` (favorável, com emendas,
-contrário ou pela rejeição) é emitido e aprovado pelo colegiado. Regra de
-negócio: matéria de mérito (PL, PLC, PDL, PR) só entra em Ordem do Dia com
-parecer aprovado, **salvo regime de urgência**, e o parecer **não vincula**
-o Plenário. Não confundir com as comissões *administrativas* do art. 45 da
+As comissões permanentes temáticas (art. 33 do Regimento Interno) **não se
+ramificam em setores**: um único setor de comissões recebe as matérias e dá
+prosseguimento. A tabela `comissao_permanente` é uma **lista de
+classificação**; cada `parecer` é **marcado** com a comissão a que
+corresponde (`comissao_id`) e traz, opcionalmente, o relator
+(`relator_parlamentar_id`). O parecer (favorável, com emendas, contrário ou
+pela rejeição) é emitido e aprovado pelo colegiado. Regra de negócio:
+matéria de mérito (PL, PLC, PDL, PR) só entra em Ordem do Dia com parecer
+aprovado, **salvo regime de urgência**, e o parecer **não vincula** o
+Plenário. Não confundir com as comissões *administrativas* do art. 45 da
 Lei 3.525/2025 (essas ficam em `designacao_comissao`, módulo de folha).
 
 O módulo de tramitação (§4) ganhou um campo **`prazo` (SLA)** por passagem:

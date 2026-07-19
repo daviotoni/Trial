@@ -175,15 +175,12 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(codigo, 422)
         self.assertIn("parecer", bloqueio["erro"])
 
-        # Distribui relatoria, emite e aprova o parecer.
-        _, relatoria = requisitar(self.base, "POST", "/relatorias", {
-            "proposicao_id": proposicao["id"],
-            "comissao": "Comissão de Legislação, Justiça e Redação Final",
-            "relator_parlamentar_id": ids[0], "data": "2025-10-02",
-            "prazo": "2025-10-04"})
+        # O setor de comissões emite o parecer, marcando a comissão temática.
         _, parecer = requisitar(
-            self.base, "POST", f"/relatorias/{relatoria['id']}/parecer",
-            {"tipo": "FAVORAVEL", "ementa": "Favorável.", "data": "2025-10-03"})
+            self.base, "POST", f"/proposicoes/{proposicao['id']}/pareceres", {
+                "comissao": "Comissão de Legislação, Justiça e Redação Final",
+                "tipo": "FAVORAVEL", "ementa": "Favorável.",
+                "data": "2025-10-03", "relator_parlamentar_id": ids[0]})
         codigo, _ = requisitar(
             self.base, "POST", f"/pareceres/{parecer['id']}/aprovacao", {})
         self.assertEqual(codigo, 200)
@@ -192,6 +189,8 @@ class TestAPI(unittest.TestCase):
             self.base, "GET", f"/proposicoes/{proposicao['id']}/pareceres")
         self.assertEqual(codigo, 200)
         self.assertEqual(lista[0]["situacao"], "APROVADO")
+        self.assertEqual(lista[0]["comissao"],
+                         "Comissão de Legislação, Justiça e Redação Final")
 
         codigo, _ = requisitar(self.base, "POST",
                                f"/sessoes/{sessao['id']}/pauta",

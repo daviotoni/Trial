@@ -255,47 +255,35 @@ CREATE TABLE voto (
 );
 
 -- ============================================================
--- Módulo 5b: Comissões, relatoria e pareceres
+-- Módulo 5b: Setor de Comissões Permanentes e pareceres
 -- ============================================================
--- Instrução da matéria nas comissões permanentes temáticas antes da
--- deliberação em Plenário (art. 33 e segs. do Regimento Interno,
--- Resolução nº 1.835/2000). Distinta das comissões administrativas do
--- art. 45 da Lei 3.525/2025 (que estão em `designacao_comissao`).
+-- As comissões permanentes temáticas (art. 33 do Regimento Interno) não
+-- se ramificam em setores distintos: um ÚNICO setor de comissões recebe
+-- todas as matérias e dá prosseguimento. As comissões temáticas ficam
+-- como uma LISTA de classificação — cada parecer é MARCADO com a comissão
+-- a que corresponde. (Distinta das comissões administrativas do art. 45,
+-- que estão em `designacao_comissao`.)
 
 CREATE TABLE comissao_permanente (
     id   INTEGER PRIMARY KEY,
     nome TEXT NOT NULL UNIQUE
 );
 
--- Distribuição de relatoria: a comissão designa um relator (parlamentar)
--- para a proposição, com prazo regimental para o parecer.
-CREATE TABLE relatoria (
+-- Parecer emitido pelo setor de comissões sobre a proposição, MARCADO com
+-- a comissão temática correspondente (comissao_id) e, opcionalmente, o
+-- relator. Não vincula o Plenário (parecer contrário não impede a
+-- deliberação), mas a matéria de mérito só entra em Ordem do Dia com
+-- parecer aprovado, salvo regime de urgência.
+CREATE TABLE parecer (
     id                     INTEGER PRIMARY KEY,
     proposicao_id          INTEGER NOT NULL REFERENCES proposicao (id),
     comissao_id            INTEGER NOT NULL REFERENCES comissao_permanente (id),
-    relator_parlamentar_id INTEGER NOT NULL REFERENCES parlamentar (id),
-    distribuida_em         TEXT NOT NULL,
-    prazo                  TEXT,   -- prazo regimental para o parecer
-    situacao               TEXT NOT NULL DEFAULT 'ATIVA' CHECK (situacao IN
-                             ('ATIVA', 'SUBSTITUIDA', 'CONCLUIDA', 'CANCELADA'))
-);
-
--- Uma única relatoria ATIVA por proposição em cada comissão.
-CREATE UNIQUE INDEX idx_relatoria_ativa
-    ON relatoria (proposicao_id, comissao_id) WHERE situacao = 'ATIVA';
-
--- Parecer da comissão sobre a proposição. Não vincula o Plenário
--- (parecer contrário não impede a deliberação), mas a matéria de mérito
--- só entra em Ordem do Dia com parecer aprovado, salvo regime de urgência.
-CREATE TABLE parecer (
-    id            INTEGER PRIMARY KEY,
-    relatoria_id  INTEGER NOT NULL REFERENCES relatoria (id),
-    proposicao_id INTEGER NOT NULL REFERENCES proposicao (id),
-    comissao_id   INTEGER NOT NULL REFERENCES comissao_permanente (id),
+    relator_parlamentar_id INTEGER REFERENCES parlamentar (id),  -- opcional
     tipo          TEXT NOT NULL CHECK (tipo IN
                     ('FAVORAVEL', 'FAVORAVEL_COM_EMENDAS',
                      'CONTRARIO', 'PELA_REJEICAO')),
     ementa        TEXT NOT NULL,
+    prazo         TEXT,
     situacao      TEXT NOT NULL DEFAULT 'EMITIDO' CHECK (situacao IN
                     ('RASCUNHO', 'EMITIDO', 'APROVADO', 'REJEITADO')),
     emitido_em    TEXT NOT NULL
@@ -463,5 +451,4 @@ CREATE INDEX idx_provimento_ativo ON provimento (cargo_id, data_fim);
 CREATE INDEX idx_tramitacao_processo ON tramitacao (processo_id);
 CREATE INDEX idx_folha_item_servidor ON folha_item (folha_id, servidor_id);
 CREATE INDEX idx_voto_votacao ON voto (votacao_id);
-CREATE INDEX idx_relatoria_proposicao ON relatoria (proposicao_id);
 CREATE INDEX idx_parecer_proposicao ON parecer (proposicao_id);

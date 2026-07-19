@@ -97,10 +97,12 @@ UNIDADE_AREAS = {
 # Ações legislativas específicas e quem pode praticá-las (trava fina por
 # competência). Os gabinetes recebem APRESENTAR_PROPOSICAO à parte (loop).
 UNIDADE_ACOES = {
-    "Presidência": ["CONVOCAR_SESSAO", "PAUTAR", "DISTRIBUIR_RELATORIA"],
-    "Mesa Diretora": ["CONVOCAR_SESSAO", "APRESENTAR_PROPOSICAO",
-                      "DISTRIBUIR_RELATORIA"],
+    "Presidência": ["CONVOCAR_SESSAO", "PAUTAR"],
+    "Mesa Diretora": ["CONVOCAR_SESSAO", "APRESENTAR_PROPOSICAO"],
     "Diretoria de Plenário": ["PAUTAR"],
+    # Setor único de comissões: recebe as matérias e emite os pareceres,
+    # marcando a comissão temática (art. 33 do Regimento Interno).
+    "Assistência às Comissões Permanentes": ["EMITIR_PARECER"],
 }
 
 RUBRICAS = [

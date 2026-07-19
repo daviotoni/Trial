@@ -22,14 +22,12 @@ class TestLegislativo(unittest.TestCase):
         self.banco.close()
 
     def _com_parecer_aprovado(self, proposicao):
-        """Distribui relatoria e aprova um parecer favorável (rito de mérito)."""
-        relatoria = comissoes.distribuir_relatoria(
+        """Emite e aprova um parecer favorável (rito de mérito)."""
+        parecer = comissoes.emitir_parecer(
             self.banco, proposicao,
             "Comissão de Legislação, Justiça e Redação Final",
-            self.vereadores[0], "2025-09-11")
-        parecer = comissoes.emitir_parecer(
-            self.banco, relatoria, "FAVORAVEL", "Parecer favorável.",
-            "2025-09-13")
+            "FAVORAVEL", "Parecer favorável.", "2025-09-13",
+            relator_parlamentar_id=self.vereadores[0])
         comissoes.aprovar_parecer(self.banco, parecer)
 
     def _proposicao_pautada(self):
@@ -178,40 +176,36 @@ class TestLegislativo(unittest.TestCase):
         # O parecer não vincula o Plenário: contrário, mas aprovado, libera.
         proposicao, _ = legislativo.apresentar_proposicao(
             self.banco, "PL", "Com parecer contrário", "2025-09-10")
-        relatoria = comissoes.distribuir_relatoria(
-            self.banco, proposicao,
-            "Comissão de Finanças e Orçamento", self.vereadores[1],
-            "2025-09-11")
         parecer = comissoes.emitir_parecer(
-            self.banco, relatoria, "CONTRARIO", "Parecer contrário.",
-            "2025-09-13")
+            self.banco, proposicao, "Comissão de Finanças e Orçamento",
+            "CONTRARIO", "Parecer contrário.", "2025-09-13")
         comissoes.aprovar_parecer(self.banco, parecer)
         sessao, _ = legislativo.convocar_sessao(self.banco, "ORDINARIA",
                                                 "2025-09-16")
         item = legislativo.pautar(self.banco, sessao, proposicao)
         self.assertIsNotNone(item)
 
-    def test_relatoria_duplicada_ativa_bloqueada(self):
+    def test_parecer_marca_a_comissao(self):
+        # Um setor só, mas o parecer é marcado com a comissão temática.
         proposicao, _ = legislativo.apresentar_proposicao(
-            self.banco, "PL", "Dupla relatoria", "2025-09-10")
-        comissoes.distribuir_relatoria(
-            self.banco, proposicao, "Comissão de Transportes",
-            self.vereadores[0], "2025-09-11")
-        with self.assertRaises(RegraViolada):
-            comissoes.distribuir_relatoria(
-                self.banco, proposicao, "Comissão de Transportes",
-                self.vereadores[1], "2025-09-12")
-
-    def test_relatoria_em_atraso(self):
-        proposicao, _ = legislativo.apresentar_proposicao(
-            self.banco, "PL", "Prazo vencido", "2025-09-10")
-        comissoes.distribuir_relatoria(
+            self.banco, "PL", "Marca comissão", "2025-09-10")
+        comissoes.emitir_parecer(
             self.banco, proposicao, "Comissão de Saúde e Assistência Social",
-            self.vereadores[0], "2025-09-11", prazo="2025-09-20")
-        atrasadas = comissoes.relatorias_em_atraso(self.banco, "2025-09-25")
-        self.assertEqual(len(atrasadas), 1)
-        self.assertEqual(atrasadas[0]["comissao"],
+            "FAVORAVEL", "Favorável.", "2025-09-13")
+        lista = comissoes.pareceres(self.banco, proposicao)
+        self.assertEqual(len(lista), 1)
+        self.assertEqual(lista[0]["comissao"],
                          "Comissão de Saúde e Assistência Social")
+
+    def test_parecer_sem_relator(self):
+        # O relator é opcional (o setor pode emitir sem designar relator).
+        proposicao, _ = legislativo.apresentar_proposicao(
+            self.banco, "PL", "Sem relator", "2025-09-10")
+        pid = comissoes.emitir_parecer(
+            self.banco, proposicao, "Comissão de Transportes",
+            "FAVORAVEL", "Favorável.", "2025-09-13")
+        self.assertIsNotNone(pid)
+        self.assertIsNone(comissoes.pareceres(self.banco, proposicao)[0]["relator"])
 
 
 if __name__ == "__main__":

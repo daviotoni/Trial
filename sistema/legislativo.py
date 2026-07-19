@@ -305,13 +305,12 @@ def main() -> None:
         unidade_protocolo_id=protocolo,
     )
 
-    # Instrução em comissão antes da Ordem do Dia (art. 33 do Regimento).
-    relatoria = comissoes.distribuir_relatoria(
-        banco, proposicao, "Comissão de Educação e Cultura", ids[1],
-        "2025-09-11", prazo="2025-09-25")
+    # Instrução no setor de comissões antes da Ordem do Dia (art. 33 do
+    # Regimento): o parecer é marcado com a comissão temática.
     parecer = comissoes.emitir_parecer(
-        banco, relatoria, "FAVORAVEL",
-        "Parecer favorável à proposição.", "2025-09-15")
+        banco, proposicao, "Comissão de Educação e Cultura", "FAVORAVEL",
+        "Parecer favorável à proposição.", "2025-09-15",
+        relator_parlamentar_id=ids[1])
     comissoes.aprovar_parecer(banco, parecer)
 
     sessao, numero = convocar_sessao(banco, "ORDINARIA", "2025-09-16")

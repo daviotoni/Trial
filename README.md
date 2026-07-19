@@ -158,14 +158,16 @@ simbólicas — com bloqueios para matéria fora de pauta ou já votada, e
 **maioria absoluta** para PLC (art. 178 do Regimento Interno).
 Demonstração: `python -m sistema.legislativo`.
 
-`sistema/comissoes.py` completa o rito: instrução da matéria nas comissões
-permanentes temáticas (art. 33 do Regimento Interno) — distribuição de
-**relatoria** a um vereador, com prazo, e emissão/aprovação do **parecer**
-(favorável, com emendas, contrário ou pela rejeição). Matéria de mérito
-(PL, PLC, PDL, PR) só entra em Ordem do Dia com parecer aprovado, **salvo
-regime de urgência**; o parecer não vincula o Plenário (parecer contrário,
-mas aprovado, libera a deliberação). Há controle de relatorias em atraso
-(prazo vencido). Demonstração: `python -m sistema.comissoes`. A tramitação
+`sistema/comissoes.py` completa o rito: as comissões permanentes temáticas
+(art. 33 do Regimento Interno) **não se ramificam em setores distintos** —
+um **único setor de comissões** recebe todas as matérias e dá
+prosseguimento. As comissões temáticas ficam como uma **lista de
+classificação**: ao emitir o **parecer** (favorável, com emendas, contrário
+ou pela rejeição), o setor **marca** a qual comissão ele corresponde e,
+opcionalmente, o relator. Matéria de mérito (PL, PLC, PDL, PR) só entra em
+Ordem do Dia com parecer aprovado, **salvo regime de urgência**; o parecer
+não vincula o Plenário (parecer contrário, mas aprovado, libera a
+deliberação). Demonstração: `python -m sistema.comissoes`. A tramitação
 de processos também passou a aceitar **prazo (SLA)** por passagem, com a
 consulta `processos_em_atraso` (rota `GET /processos/atrasados`).
 

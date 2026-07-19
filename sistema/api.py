@@ -480,21 +480,17 @@ class Aplicacao:
 
     # ------------------------ comissões ----------------------------
 
-    def distribuir_relatoria(self, dados):
-        autenticacao.exigir_acao(self.banco, self.usuario_atual,
-                                 "DISTRIBUIR_RELATORIA")
-        rid = comissoes.distribuir_relatoria(
-            self.banco, dados["proposicao_id"], dados["comissao"],
-            dados["relator_parlamentar_id"], dados["data"],
-            dados.get("prazo"),
-        )
-        self.banco.commit()
-        return {"id": rid}
+    def comissoes(self):
+        """Lista as comissões temáticas (para marcar o parecer)."""
+        return comissoes.comissoes(self.banco)
 
-    def emitir_parecer(self, relatoria_id: int, dados):
+    def emitir_parecer(self, proposicao_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "EMITIR_PARECER")
         pid = comissoes.emitir_parecer(
-            self.banco, relatoria_id, dados["tipo"], dados["ementa"],
-            dados["data"],
+            self.banco, proposicao_id, dados["comissao"], dados["tipo"],
+            dados["ementa"], dados["data"],
+            dados.get("relator_parlamentar_id"), dados.get("prazo"),
         )
         self.banco.commit()
         return {"id": pid}
@@ -506,10 +502,6 @@ class Aplicacao:
 
     def pareceres(self, proposicao_id: int):
         return comissoes.pareceres(self.banco, proposicao_id)
-
-    def relatorias_em_atraso(self):
-        return comissoes.relatorias_em_atraso(
-            self.banco, self.query_atual.get("referencia", [""])[0])
 
     def votar(self, sessao_id: int, dados):
         votos = dados.get("votos")
@@ -654,11 +646,8 @@ ROTAS = [
      lambda app, m, d: app.votar(int(m.group(1)), d)),
     ("GET", r"^/sessoes/(\d+)/votacoes/(\d+)$", None,
      lambda app, m, d: app.placar(int(m.group(1)), int(m.group(2)))),
-    ("POST", r"^/relatorias$", "LEGISLATIVO",
-     lambda app, m, d: app.distribuir_relatoria(d)),
-    ("GET", r"^/relatorias/atrasadas$", "LEGISLATIVO",
-     lambda app, m, d: app.relatorias_em_atraso()),
-    ("POST", r"^/relatorias/(\d+)/parecer$", "LEGISLATIVO",
+    ("GET", r"^/comissoes$", None, lambda app, m, d: app.comissoes()),
+    ("POST", r"^/proposicoes/(\d+)/pareceres$", "LEGISLATIVO",
      lambda app, m, d: app.emitir_parecer(int(m.group(1)), d)),
     ("POST", r"^/pareceres/(\d+)/aprovacao$", "LEGISLATIVO",
      lambda app, m, d: app.aprovar_parecer(int(m.group(1)))),

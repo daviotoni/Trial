@@ -1,14 +1,15 @@
-"""Módulo de comissões: relatoria e pareceres.
+"""Módulo de comissões: setor único de comissões e pareceres.
 
-Cobre a instrução da matéria nas comissões permanentes temáticas antes da
-deliberação em Plenário (art. 33 e seguintes do Regimento Interno,
-Resolução nº 1.835/2000):
+As comissões permanentes temáticas (art. 33 do Regimento Interno) não se
+ramificam em setores distintos: um **único setor de comissões** recebe
+todas as matérias e dá prosseguimento. As comissões temáticas
+(Legislação/Justiça, Finanças, Educação…) ficam como uma **lista de
+classificação** — ao emitir o parecer, o setor **marca** a qual comissão
+ele corresponde.
 
-- distribuição da proposição a uma comissão, com designação de relator
-  (parlamentar) e prazo regimental para o parecer;
-- emissão do parecer (favorável, favorável com emendas, contrário ou pela
-  rejeição) e sua aprovação pelo colegiado;
-- controle de relatorias em atraso (prazo vencido sem parecer).
+- emissão do parecer (favorável, com emendas, contrário ou pela rejeição),
+  marcando a comissão temática e, opcionalmente, o relator;
+- aprovação do parecer pelo colegiado.
 
 Regra de mérito adotada pelo módulo legislativo: proposições de mérito
 (PL, PLC, PDL, PR) só entram em Ordem do Dia com **parecer aprovado**,
@@ -35,6 +36,15 @@ TIPOS_PARECER = {
 }
 
 
+def comissoes(banco: sqlite3.Connection) -> list[dict]:
+    """Lista as comissões temáticas (para marcar o parecer)."""
+    return [
+        {"id": cid, "nome": nome}
+        for cid, nome in banco.execute(
+            "SELECT id, nome FROM comissao_permanente ORDER BY id")
+    ]
+
+
 def _comissao_id(banco: sqlite3.Connection, comissao: str | int) -> int:
     """Resolve a comissão por id ou por nome exato."""
     if isinstance(comissao, int):
@@ -50,82 +60,42 @@ def _comissao_id(banco: sqlite3.Connection, comissao: str | int) -> int:
     return linha[0]
 
 
-def distribuir_relatoria(
+def emitir_parecer(
     banco: sqlite3.Connection,
     proposicao_id: int,
     comissao: str | int,
-    relator_parlamentar_id: int,
-    data: str,
-    prazo: str | None = None,
-) -> int:
-    """Distribui a proposição a uma comissão e designa o relator.
-
-    Bloqueia relatoria duplicada ativa na mesma comissão. Devolve o id.
-    """
-    linha = banco.execute(
-        "SELECT tipo FROM proposicao WHERE id = ?", (proposicao_id,)
-    ).fetchone()
-    if linha is None:
-        raise RegraViolada("proposição inexistente")
-    comissao_id = _comissao_id(banco, comissao)
-    if banco.execute(
-        "SELECT id FROM parlamentar WHERE id = ?", (relator_parlamentar_id,)
-    ).fetchone() is None:
-        raise RegraViolada("relator (parlamentar) inexistente")
-
-    ja_ativa = banco.execute(
-        "SELECT COUNT(*) FROM relatoria WHERE proposicao_id = ? AND "
-        "comissao_id = ? AND situacao = 'ATIVA'",
-        (proposicao_id, comissao_id),
-    ).fetchone()[0]
-    if ja_ativa:
-        raise RegraViolada(
-            "já há relatoria ativa desta proposição nesta comissão")
-
-    return banco.execute(
-        "INSERT INTO relatoria (proposicao_id, comissao_id, "
-        "relator_parlamentar_id, distribuida_em, prazo) VALUES (?, ?, ?, ?, ?)",
-        (proposicao_id, comissao_id, relator_parlamentar_id, data, prazo),
-    ).lastrowid
-
-
-def emitir_parecer(
-    banco: sqlite3.Connection,
-    relatoria_id: int,
     tipo: str,
     ementa: str,
     data: str,
+    relator_parlamentar_id: int | None = None,
+    prazo: str | None = None,
 ) -> int:
-    """Registra o parecer do relator e conclui a relatoria. Devolve o id.
+    """Emite um parecer sobre a proposição, MARCANDO a comissão temática.
 
     O parecer nasce EMITIDO; a aprovação pelo colegiado é passo separado
-    (`aprovar_parecer`).
+    (`aprovar_parecer`). `relator_parlamentar_id` é opcional.
     """
     if tipo not in TIPOS_PARECER:
         raise RegraViolada(
             "tipo de parecer inválido: use FAVORAVEL, FAVORAVEL_COM_EMENDAS, "
             "CONTRARIO ou PELA_REJEICAO")
-    linha = banco.execute(
-        "SELECT proposicao_id, comissao_id, situacao FROM relatoria "
-        "WHERE id = ?", (relatoria_id,)
-    ).fetchone()
-    if linha is None:
-        raise RegraViolada("relatoria inexistente")
-    proposicao_id, comissao_id, situacao = linha
-    if situacao != "ATIVA":
-        raise RegraViolada(f"relatoria {situacao.lower()} não comporta parecer")
+    if banco.execute(
+        "SELECT id FROM proposicao WHERE id = ?", (proposicao_id,)
+    ).fetchone() is None:
+        raise RegraViolada("proposição inexistente")
+    comissao_id = _comissao_id(banco, comissao)
+    if relator_parlamentar_id is not None and banco.execute(
+        "SELECT id FROM parlamentar WHERE id = ?", (relator_parlamentar_id,)
+    ).fetchone() is None:
+        raise RegraViolada("relator (parlamentar) inexistente")
 
-    parecer_id = banco.execute(
-        "INSERT INTO parecer (relatoria_id, proposicao_id, comissao_id, "
-        "tipo, ementa, situacao, emitido_em) "
-        "VALUES (?, ?, ?, ?, ?, 'EMITIDO', ?)",
-        (relatoria_id, proposicao_id, comissao_id, tipo, ementa, data),
+    return banco.execute(
+        "INSERT INTO parecer (proposicao_id, comissao_id, "
+        "relator_parlamentar_id, tipo, ementa, prazo, situacao, emitido_em) "
+        "VALUES (?, ?, ?, ?, ?, ?, 'EMITIDO', ?)",
+        (proposicao_id, comissao_id, relator_parlamentar_id, tipo, ementa,
+         prazo, data),
     ).lastrowid
-    banco.execute(
-        "UPDATE relatoria SET situacao = 'CONCLUIDA' WHERE id = ?",
-        (relatoria_id,),
-    )
-    return parecer_id
 
 
 def aprovar_parecer(banco: sqlite3.Connection, parecer_id: int) -> None:
@@ -136,8 +106,8 @@ def aprovar_parecer(banco: sqlite3.Connection, parecer_id: int) -> None:
 def rejeitar_parecer(banco: sqlite3.Connection, parecer_id: int) -> None:
     """Rejeita o parecer no colegiado (situação EMITIDO → REJEITADO).
 
-    Rejeitar o parecer do relator não rejeita a matéria: exige novo
-    parecer (designar outro relator) antes da Ordem do Dia.
+    Rejeitar o parecer não rejeita a matéria: exige novo parecer antes da
+    Ordem do Dia.
     """
     _mudar_situacao_parecer(banco, parecer_id, "EMITIDO", "REJEITADO")
 
@@ -169,7 +139,7 @@ def exige_parecer(tipo_proposicao: str) -> bool:
 
 
 def pareceres(banco: sqlite3.Connection, proposicao_id: int) -> list[dict]:
-    """Lista os pareceres da proposição, com comissão e relator."""
+    """Lista os pareceres da proposição, com a comissão marcada e o relator."""
     return [
         {"id": pid, "comissao": comissao, "relator": relator,
          "tipo": tipo, "ementa": ementa, "situacao": situacao,
@@ -179,29 +149,9 @@ def pareceres(banco: sqlite3.Connection, proposicao_id: int) -> list[dict]:
                       p.situacao, p.emitido_em
                  FROM parecer p
                  JOIN comissao_permanente c ON c.id = p.comissao_id
-                 JOIN relatoria r ON r.id = p.relatoria_id
-                 JOIN parlamentar pl ON pl.id = r.relator_parlamentar_id
+                 LEFT JOIN parlamentar pl ON pl.id = p.relator_parlamentar_id
                 WHERE p.proposicao_id = ?
                 ORDER BY p.id""", (proposicao_id,),
-        )
-    ]
-
-
-def relatorias_em_atraso(banco: sqlite3.Connection, referencia: str) -> list[dict]:
-    """Relatorias ATIVAS com prazo vencido em relação à data de referência."""
-    return [
-        {"relatoria_id": rid, "proposicao": f"{tipo} {numero}/{ano}",
-         "comissao": comissao, "relator": relator, "prazo": prazo}
-        for rid, tipo, numero, ano, comissao, relator, prazo in banco.execute(
-            """SELECT r.id, pr.tipo, pr.numero, pr.ano,
-                      c.nome, pl.nome, r.prazo
-                 FROM relatoria r
-                 JOIN proposicao pr ON pr.id = r.proposicao_id
-                 JOIN comissao_permanente c ON c.id = r.comissao_id
-                 JOIN parlamentar pl ON pl.id = r.relator_parlamentar_id
-                WHERE r.situacao = 'ATIVA'
-                  AND r.prazo IS NOT NULL AND r.prazo < ?
-                ORDER BY r.prazo""", (referencia,),
         )
     ]
 
@@ -223,17 +173,13 @@ def main() -> None:
         autor_parlamentar_id=relator)
 
     print(f"Proposição apresentada: {ref}")
-    rel = distribuir_relatoria(
-        banco, proposicao, "Comissão de Legislação, Justiça e Redação Final",
-        relator, "2025-09-11", prazo="2025-09-25")
-    print(f"Relatoria distribuída (id {rel}), prazo 2025-09-25")
-
+    print("O setor de comissões recebe a matéria e emite o parecer, "
+          "marcando a comissão:")
     parecer_id = emitir_parecer(
-        banco, rel, "FAVORAVEL",
-        "Parecer favorável: matéria constitucional e de interesse público.",
-        "2025-09-20")
+        banco, proposicao, "Comissão de Educação e Cultura", "FAVORAVEL",
+        "Parecer favorável: matéria de interesse público.", "2025-09-20",
+        relator_parlamentar_id=relator)
     aprovar_parecer(banco, parecer_id)
-    print("Parecer emitido e aprovado pela comissão.")
 
     print(f"Tem parecer aprovado? {tem_parecer_aprovado(banco, proposicao)}")
     for p in pareceres(banco, proposicao):
