@@ -404,6 +404,16 @@ CREATE TABLE unidade_area (
     PRIMARY KEY (unidade_id, area)
 );
 
+-- Ações específicas que cada unidade pode praticar dentro de uma área
+-- (trava fina por competência). Ex.: um gabinete opera a área LEGISLATIVO,
+-- mas dentro dela só APRESENTAR_PROPOSICAO; CONVOCAR_SESSAO é da
+-- Presidência/Mesa. Sem regra de ação, a área basta.
+CREATE TABLE unidade_acao (
+    unidade_id INTEGER NOT NULL REFERENCES unidade (id),
+    acao       TEXT NOT NULL,
+    PRIMARY KEY (unidade_id, acao)
+);
+
 -- ============================================================
 -- Módulo 9: Competências legais e fluxo processual
 -- ============================================================

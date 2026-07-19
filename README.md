@@ -120,6 +120,15 @@ permanecem públicas, por princípio da LAI. Sem login → 401; sem alçada →
 mas cada setor conduz o que está com ele. A trilha de auditoria registra o
 login de quem fez cada operação.
 
+**Trava fina por competência (Lei 3.525/2025)**: além da área, atos
+legislativos específicos exigem a competência que a lei atribui ao órgão
+(`unidade_acao`). Um gabinete opera a área LEGISLATIVO e pode
+**APRESENTAR_PROPOSICAO**, mas **não** CONVOCAR_SESSAO nem PAUTAR — esses
+atos são da Presidência/Mesa (art. 14) e da Diretoria de Plenário. `GET
+/me` traz também as `acoes` do setor. Cada coordenadoria e órgão de 1º grau
+carrega sua competência com o artigo correspondente (arts. 11–39), exibida
+no painel "Competências do meu setor".
+
 A API (`sistema/api.py`, biblioteca padrão, sem dependências) expõe
 organograma, unidades, cargos com vagas disponíveis, servidores, nomeações,
 processos/tramitações, plenário e cálculo de folha — e serve em `/` a

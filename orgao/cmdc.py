@@ -96,49 +96,75 @@ COORDENADORIAS = [
 # ao papel de cada setor; base normativa: Lei 3.525/2025. Coordenadorias
 # não listadas recebem uma competência genérica de apoio administrativo.
 COMPETENCIAS_COORDENADORIA = {
-    "Coordenadoria da Secretaria-Geral":
-        "Protocolo-geral, autuação, numeração e tramitação de processos "
-        "administrativos e legislativos",
-    "Coordenadoria de Recursos Humanos":
-        "Gestão de pessoal: cadastro, provimento, lotação e vida funcional "
-        "dos servidores",
     "Coordenadoria de Apoio Legislativo":
-        "Apoio ao processo legislativo e às sessões plenárias",
+        "Apoio ao processo legislativo e às sessões plenárias (art. 20)",
     "Coordenadoria de Assuntos de Plenário":
-        "Suporte à ordem do dia e aos trabalhos de Plenário",
+        "Suporte à ordem do dia e aos trabalhos de Plenário (art. 21)",
     "Coordenadoria de Atas e Projetos":
-        "Elaboração de atas das sessões e autuação de projetos e proposições",
-    "Coordenadoria de Redação Oficial e Legislativa":
-        "Redação final de autógrafos, leis e atos normativos",
+        "Elaboração de atas das sessões e autuação de projetos e "
+        "proposições (art. 22)",
+    "Coordenadoria de Avaliação e Acompanhamento de Compras":
+        "Fiscalização e acompanhamento das aquisições e contratações "
+        "(art. 23)",
+    "Coordenadoria de Cerimonial e Comunicação Social":
+        "Cerimonial, comunicação institucional e imprensa (art. 24)",
+    "Coordenadoria de Contabilidade":
+        "Escrituração contábil, empenho e execução orçamentária (art. 25)",
+    "Coordenadoria de Documentação Histórica":
+        "Guarda e preservação do acervo documental e histórico (art. 26)",
+    "Coordenadoria de Finanças":
+        "Gestão financeira, pagamentos e conciliação (art. 27)",
     "Coordenadoria de Licitações e Contratos":
-        "Formalização e gestão de licitações e contratos (Lei 14.133/2021)",
+        "Formalização e gestão de licitações e contratos, Lei 14.133/2021 "
+        "(art. 28)",
+    "Coordenadoria de Manutenção":
+        "Manutenção predial e das instalações; serviços de copa, limpeza e "
+        "reprografia (art. 29)",
     "Coordenadoria de Material":
         "Gestão de material e almoxarifado; termo de referência e pesquisa "
-        "de preços",
-    "Coordenadoria de Avaliação e Acompanhamento de Compras":
-        "Fiscalização e acompanhamento das aquisições e contratações",
-    "Coordenadoria de Contabilidade":
-        "Escrituração contábil, empenho e execução orçamentária",
-    "Coordenadoria de Finanças":
-        "Gestão financeira, pagamentos e conciliação",
+        "de preços (art. 30)",
     "Coordenadoria de Patrimônio":
-        "Registro, controle e baixa dos bens patrimoniais",
-    "Coordenadoria de Publicações e Transparência":
-        "Publicação oficial dos atos e transparência ativa (LAI)",
-    "Coordenadoria de Cerimonial e Comunicação Social":
-        "Cerimonial, comunicação institucional e imprensa",
-    "Coordenadoria de Documentação Histórica":
-        "Guarda e preservação do acervo documental e histórico",
-    "Coordenadoria de Tecnologia da Informação e Comunicação":
-        "Gestão dos sistemas e da infraestrutura de tecnologia da informação",
+        "Registro, controle e baixa dos bens patrimoniais (art. 31)",
     "Coordenadoria de Polícia Legislativa":
-        "Segurança institucional e poder de polícia no âmbito da Câmara",
+        "Segurança institucional, poder de polícia e fiscalização da "
+        "vigilância (art. 32)",
     "Coordenadoria de Prevenção a Incêndio":
-        "Prevenção e combate a incêndio e segurança predial",
-    "Coordenadoria de Manutenção":
-        "Manutenção predial e das instalações",
+        "Prevenção e combate a incêndio e segurança predial (art. 33)",
+    "Coordenadoria de Publicações e Transparência":
+        "Publicação oficial dos atos e transparência ativa, LAI (art. 34)",
+    "Coordenadoria de Redação Oficial e Legislativa":
+        "Redação final de autógrafos, leis e atos normativos (art. 35)",
+    "Coordenadoria de Recursos Humanos":
+        "Gestão de pessoal: cadastro, provimento, lotação e vida funcional "
+        "dos servidores (art. 36)",
+    "Coordenadoria da Secretaria-Geral":
+        "Protocolo-geral, autuação, numeração e tramitação de processos "
+        "administrativos e legislativos (art. 37)",
+    "Coordenadoria de Tecnologia da Informação e Comunicação":
+        "Gestão dos sistemas e da infraestrutura de tecnologia da "
+        "informação (art. 38)",
     "Diretoria Administrativa":
-        "Coordenação dos serviços administrativos e auxiliares",
+        "Coordenação dos serviços administrativos e auxiliares (art. 39)",
+}
+
+# Órgãos superiores (1º grau) e seus artigos de competência (arts. 11-19).
+COMPETENCIAS_ORGAO_SUPERIOR = {
+    "Consultoria-Geral Legislativa":
+        "Consultoria e assessoramento técnico-legislativo (art. 11)",
+    "Controladoria-Geral":
+        "Controle interno, auditoria e fiscalização (art. 12)",
+    "Diretoria da Escola do Legislativo":
+        "Formação e capacitação legislativa (art. 13)",
+    "Diretoria de Plenário":
+        "Organização dos trabalhos e da ordem do dia do Plenário (art. 14)",
+    "Superintendência-Geral":
+        "Superintendência dos serviços administrativos (art. 16)",
+    "Superintendência de Assuntos Estratégicos":
+        "Planejamento e assuntos estratégicos (art. 17)",
+    "Ouvidoria-Geral":
+        "Ouvidoria: recebimento e encaminhamento de demandas (art. 18)",
+    "Procuradoria-Geral":
+        "Representação e consultoria jurídica da Câmara (art. 19)",
 }
 
 # 3º grau — Órgãos de Assessoramento Parlamentar, lotados nos gabinetes
@@ -349,9 +375,9 @@ def construir_cmdc() -> Orgao:
         unidade = presidencia.adicionar_subunidade(
             UnidadeAdministrativa(nome=nome, sigla=sigla)
         )
-        unidade.adicionar_competencia(
-            Competencia("Órgão superior de direção e assessoramento técnico", LEI_3525)
-        )
+        descricao = COMPETENCIAS_ORGAO_SUPERIOR.get(
+            nome, "Órgão superior de direção e assessoramento técnico")
+        unidade.adicionar_competencia(Competencia(descricao, LEI_3525))
         _cargo_dirigente(unidade)
 
     # Comissões permanentes de apoio à administração (art. 45, §1º).
@@ -372,7 +398,7 @@ def construir_cmdc() -> Orgao:
     diretoria_geral.adicionar_competencia(
         Competencia(
             "Órgão central de apoio administrativo, diretamente subordinado "
-            "à Presidência (art. 15)",
+            "à Presidência; supervisiona telefonia e transporte (art. 15)",
             LEI_3525,
         )
     )

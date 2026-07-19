@@ -370,6 +370,36 @@ class TestAPI(unittest.TestCase):
         self.assertNotIn("PL para acompanhar",
                          {p["assunto"] for p in caixa})
 
+    def test_trava_fina_por_competencia(self):
+        _, unidades = requisitar(self.base, "GET", "/unidades")
+        gab = next(u for u in unidades
+                   if u["nome"].startswith("Gabinete do(a)"))
+        _, leg = requisitar(self.base, "POST", "/legislaturas", {
+            "numero": 30, "inicio": "2025-01-01", "fim": "2028-12-31"})
+        requisitar(self.base, "POST", "/usuarios", {
+            "login": "gab.trava", "senha": "senha123", "perfil": "LEGISLATIVO",
+            "unidade_id": gab["id"]})
+        _, s = requisitar(self.base, "POST", "/login",
+                          {"login": "gab.trava", "senha": "senha123"},
+                          token=False)
+        tk = s["token"]
+
+        # /me revela a competência de ação do gabinete.
+        _, eu = requisitar(self.base, "GET", "/me", token=tk)
+        self.assertEqual(eu["acoes"], ["APRESENTAR_PROPOSICAO"])
+
+        # Gabinete PODE apresentar proposição (competência dele).
+        codigo, _ = requisitar(self.base, "POST", "/proposicoes", {
+            "tipo": "PL", "ementa": "PL do gabinete", "data": "2025-10-01"},
+            token=tk)
+        self.assertEqual(codigo, 200)
+
+        # Mas NÃO pode convocar sessão (ato da Presidência/Mesa) → 403.
+        codigo, erro = requisitar(self.base, "POST", "/sessoes", {
+            "tipo": "ORDINARIA", "data": "2025-10-05"}, token=tk)
+        self.assertEqual(codigo, 403)
+        self.assertIn("competência", erro["erro"])
+
     def test_escrita_sem_login_retorna_401(self):
         codigo, erro = requisitar(self.base, "POST", "/processos", {
             "tipo": "ADMINISTRATIVO", "assunto": "X",

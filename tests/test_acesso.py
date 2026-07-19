@@ -85,6 +85,26 @@ class TestAcessoPorUnidade(unittest.TestCase):
         with self.assertRaises(AcessoNegado):
             autenticacao.exigir_posse(self.banco, user_a, pid)
 
+    # --- trava fina por competência (ações) -------------------------
+
+    def test_gabinete_apresenta_mas_nao_convoca_sessao(self):
+        gab = "Gabinete do(a) Vereador(a) Chiquinho Caipira"
+        u = self._usuario("ver.chico", "LEGISLATIVO", gab)
+        acoes = autenticacao.acoes_da_unidade(self.banco, u)
+        self.assertEqual(acoes, {"APRESENTAR_PROPOSICAO"})
+        autenticacao.exigir_acao(self.banco, u, "APRESENTAR_PROPOSICAO")  # ok
+        with self.assertRaises(AcessoNegado):
+            autenticacao.exigir_acao(self.banco, u, "CONVOCAR_SESSAO")
+
+    def test_presidencia_convoca_sessao(self):
+        u = self._usuario("pres", "LEGISLATIVO", "Presidência")
+        autenticacao.exigir_acao(self.banco, u, "CONVOCAR_SESSAO")  # ok
+        autenticacao.exigir_acao(self.banco, u, "PAUTAR")  # ok
+
+    def test_admin_ignora_trava_de_acao(self):
+        u = self._usuario("adm3", "ADMIN")
+        autenticacao.exigir_acao(self.banco, u, "CONVOCAR_SESSAO")  # não levanta
+
     def test_admin_ignora_posse(self):
         a = "Coordenadoria da Secretaria-Geral"
         admin = self._usuario("adm2", "ADMIN")

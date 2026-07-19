@@ -110,6 +110,7 @@ class Aplicacao:
             "login": u["login"], "perfil": u["perfil"],
             "unidade_id": u.get("unidade_id"), "unidade": unidade,
             "areas": sorted(autenticacao.areas_do_usuario(self.banco, u)),
+            "acoes": sorted(autenticacao.acoes_da_unidade(self.banco, u)),
         }
 
     # -------------------------- consultas --------------------------
@@ -450,6 +451,8 @@ class Aplicacao:
         return {"id": legislatura_id}
 
     def apresentar_proposicao(self, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
         proposicao_id, rotulo = legislativo.apresentar_proposicao(
             self.banco, dados["tipo"], dados["ementa"], dados["data"],
             dados.get("autor_parlamentar_id"),
@@ -459,6 +462,8 @@ class Aplicacao:
         return {"id": proposicao_id, "rotulo": rotulo}
 
     def convocar_sessao(self, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "CONVOCAR_SESSAO")
         sessao_id, numero = legislativo.convocar_sessao(
             self.banco, dados["tipo"], dados["data"],
         )
@@ -466,6 +471,7 @@ class Aplicacao:
         return {"id": sessao_id, "numero": numero}
 
     def pautar(self, sessao_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual, "PAUTAR")
         item = legislativo.pautar(
             self.banco, sessao_id, dados["proposicao_id"],
             urgencia=bool(dados.get("urgencia", False)))
@@ -475,6 +481,8 @@ class Aplicacao:
     # ------------------------ comissões ----------------------------
 
     def distribuir_relatoria(self, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "DISTRIBUIR_RELATORIA")
         rid = comissoes.distribuir_relatoria(
             self.banco, dados["proposicao_id"], dados["comissao"],
             dados["relator_parlamentar_id"], dados["data"],

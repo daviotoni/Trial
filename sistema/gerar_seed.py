@@ -59,6 +59,15 @@ UNIDADE_AREAS = {
     "Coordenadoria de Tecnologia da Informação e Comunicação": ["USUARIOS"],
 }
 
+# Ações legislativas específicas e quem pode praticá-las (trava fina por
+# competência). Os gabinetes recebem APRESENTAR_PROPOSICAO à parte (loop).
+UNIDADE_ACOES = {
+    "Presidência": ["CONVOCAR_SESSAO", "PAUTAR", "DISTRIBUIR_RELATORIA"],
+    "Mesa Diretora": ["CONVOCAR_SESSAO", "APRESENTAR_PROPOSICAO",
+                      "DISTRIBUIR_RELATORIA"],
+    "Diretoria de Plenário": ["PAUTAR"],
+}
+
 RUBRICAS = [
     ("VENC", "Vencimento/retribuição básica", "VENCIMENTO",
      "Lei 3.525/2025, art. 6º", None, 1),
@@ -175,8 +184,9 @@ def gerar() -> str:
             comp_rows.append(f"  ({ids[id(u)]}, {_sql(c.descricao)}, {_sql(base)})")
         fila.extend(u.subunidades)
     # Competência de cada gabinete (exercício do mandato parlamentar).
-    COMP_GABINETE = ("Exercício do mandato parlamentar: autoria e "
-                     "apresentação de proposições (art. 3º, §2º)")
+    COMP_GABINETE = ("Assessoramento político-legislativo ao titular do "
+                     "mandato; autoria e apresentação de proposições "
+                     "(art. 1º, p.u., e art. 79)")
     for gid in gab_ids:
         comp_rows.append(
             f"  ({gid}, {_sql(COMP_GABINETE)}, {_sql('Lei 3.525/2025')})")
@@ -311,6 +321,17 @@ def gerar() -> str:
         area_rows.append(f"  ({gid}, {_sql('LEGISLATIVO')})")
     out("INSERT INTO unidade_area (unidade_id, area) VALUES")
     out(",\n".join(area_rows) + ";")
+    out("")
+
+    # Ações específicas por unidade (trava fina). Gabinetes só apresentam.
+    acao_rows = []
+    for nome, acoes in UNIDADE_ACOES.items():
+        for acao in acoes:
+            acao_rows.append(f"  ({_uid(nome)}, {_sql(acao)})")
+    for gid in gab_ids:
+        acao_rows.append(f"  ({gid}, {_sql('APRESENTAR_PROPOSICAO')})")
+    out("INSERT INTO unidade_acao (unidade_id, acao) VALUES")
+    out(",\n".join(acao_rows) + ";")
     out("")
     return "\n".join(linhas)
 

@@ -176,6 +176,36 @@ def exigir_posse(banco: sqlite3.Connection, usuario: dict,
             "pode encaminhá-lo")
 
 
+def acoes_da_unidade(banco: sqlite3.Connection, usuario: dict) -> set[str]:
+    """Ações específicas que a unidade do usuário pode praticar."""
+    if usuario["perfil"] == "ADMIN":
+        return {"*"}
+    if not usuario.get("unidade_id"):
+        return set()
+    return {
+        acao for (acao,) in banco.execute(
+            "SELECT acao FROM unidade_acao WHERE unidade_id = ?",
+            (usuario["unidade_id"],),
+        )
+    }
+
+
+def exigir_acao(banco: sqlite3.Connection, usuario: dict, acao: str) -> None:
+    """Trava fina por competência: a unidade do usuário pode praticar a ação?
+
+    ADMIN e usuários sem lotação (perfil legado) não são limitados por
+    ação — a área já os autorizou. Um setor lotado precisa ter a ação
+    explicitamente atribuída (unidade_acao).
+    """
+    if usuario["perfil"] == "ADMIN" or not usuario.get("unidade_id"):
+        return
+    permitidas = acoes_da_unidade(banco, usuario)
+    if acao not in permitidas:
+        raise AcessoNegado(
+            f"o setor {usuario['login']} não tem competência para {acao} "
+            "(a lei atribui esse ato a outro órgão)")
+
+
 def main() -> None:
     from sistema import servicos
     from sistema.demo import criar_banco

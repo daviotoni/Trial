@@ -161,6 +161,13 @@ operacional inclui os **29 gabinetes** de vereador (20ª Legislatura) como
 unidades com acesso legislativo próprio — dado de roster, separado da
 estrutura da lei em `orgao/cmdc.py`.
 
+Uma terceira camada, `unidade_acao`, faz a **trava fina por competência**:
+dentro de uma área, certos atos exigem a competência que a lei atribui ao
+órgão. Ex.: gabinete (área LEGISLATIVO) só `APRESENTAR_PROPOSICAO`;
+`CONVOCAR_SESSAO`/`PAUTAR` são da Presidência/Mesa/Diretoria de Plenário.
+As competências de cada unidade (tabela `competencia`) trazem o artigo da
+Lei 3.525/2025 (arts. 11–39, e art. 79 para os gabinetes).
+
 ## Decisões de projeto
 
 1. **SQL portável**: sem tipos proprietários; roda hoje em SQLite (estudo,
