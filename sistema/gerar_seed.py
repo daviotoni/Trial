@@ -112,6 +112,21 @@ def gerar() -> str:
     out(",\n".join(valores) + ";")
     out("")
 
+    # Competências de cada unidade — a Lei 3.525/2025 traduzida em regra
+    # operacional (fonte: as Competencia anexadas às unidades em cmdc.py).
+    comp_rows = []
+    fila = [cmdc.unidade_topo]
+    while fila:
+        u = fila.pop(0)
+        for c in u.competencias:
+            base = str(c.base_legal) if c.base_legal else None
+            comp_rows.append(f"  ({ids[id(u)]}, {_sql(c.descricao)}, {_sql(base)})")
+        fila.extend(u.subunidades)
+    if comp_rows:
+        out("INSERT INTO competencia (unidade_id, descricao, base_legal) VALUES")
+        out(",\n".join(comp_rows) + ";")
+        out("")
+
     # Símbolos únicos do Anexo I (validando consistência de valores).
     simbolos: dict[str, int] = {}
     for _, valor, simbolo, _ in ANEXO_I:
@@ -168,6 +183,64 @@ def gerar() -> str:
         f"  ({i}, {_sql(nome)})"
         for i, nome in enumerate(COMISSOES_PERMANENTES_REGIMENTAIS, start=1)
     ) + ";")
+    out("")
+
+    # Tipos de processo e seus ritos (fluxo por etapas). Configuráveis:
+    # o caminho é dado, não fixo no código. Cada etapa é a passagem por uma
+    # unidade real da Lei 3.525/2025, com a ação e o prazo (SLA) sugerido.
+    def _uid(nome: str) -> int:
+        if nome not in unidade_db_por_nome:
+            raise ValueError(f"unidade inexistente no fluxo: {nome!r}")
+        return unidade_db_por_nome[nome]
+
+    # (codigo, nome, dominio, [(unidade, acao, prazo_dias), ...])
+    fluxos = [
+        ("PL", "Projeto de Lei", "LEGISLATIVO", [
+            ("Gabinetes de Vereadores", "Autoria e apresentação da proposição", 0),
+            ("Coordenadoria da Secretaria-Geral",
+             "Protocolo, autuação e numeração", 2),
+            ("Consultoria-Geral Legislativa",
+             "Análise de constitucionalidade e técnica legislativa", 10),
+            ("Assistência às Comissões Permanentes",
+             "Distribuição às comissões e coleta de pareceres", 15),
+            ("Diretoria de Plenário",
+             "Inclusão em Ordem do Dia e deliberação", 5),
+            ("Coordenadoria de Redação Oficial e Legislativa",
+             "Redação final do autógrafo", 3),
+            ("Presidência", "Promulgação ou encaminhamento à sanção", 5),
+        ]),
+        ("COMPRA", "Contratação (Lei 14.133/2021)", "ADMINISTRATIVO", [
+            ("Coordenadoria da Secretaria-Geral",
+             "Protocolo e autuação do pedido", 2),
+            ("Diretoria-Geral", "Autorização da despesa", 3),
+            ("Coordenadoria de Material",
+             "Termo de referência e pesquisa de preços", 10),
+            ("Procuradoria-Geral", "Parecer jurídico prévio", 7),
+            ("Comissão Permanente de Licitação",
+             "Condução do certame licitatório", 30),
+            ("Coordenadoria de Licitações e Contratos",
+             "Homologação e formalização do contrato", 5),
+            ("Coordenadoria de Contabilidade", "Empenho da despesa", 3),
+            ("Coordenadoria de Publicações e Transparência",
+             "Publicação do extrato", 2),
+        ]),
+    ]
+    out("INSERT INTO tipo_processo (id, codigo, nome, dominio) VALUES")
+    out(",\n".join(
+        f"  ({i}, {_sql(cod)}, {_sql(nome)}, {_sql(dom)})"
+        for i, (cod, nome, dom, _) in enumerate(fluxos, start=1)
+    ) + ";")
+    out("")
+
+    etapa_rows = []
+    for tp_id, (_, _, _, etapas) in enumerate(fluxos, start=1):
+        for ordem, (unidade, acao, prazo) in enumerate(etapas, start=1):
+            etapa_rows.append(
+                f"  ({tp_id}, {ordem}, {_uid(unidade)}, {_sql(acao)}, "
+                f"{_sql(prazo)}, 1)")
+    out("INSERT INTO fluxo_etapa (tipo_processo_id, ordem, unidade_id, "
+        "acao, prazo_dias, obrigatoria) VALUES")
+    out(",\n".join(etapa_rows) + ";")
     out("")
     return "\n".join(linhas)
 

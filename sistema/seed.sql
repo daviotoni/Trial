@@ -55,6 +55,28 @@ INSERT INTO unidade (id, nome, sigla, grau, tipo, unidade_pai_id, norma_id, vige
   (48, 'Transporte', NULL, 4, 'AUXILIAR', 41, 1, '2025-09-01'),
   (49, 'Vigilância Patrimonial', NULL, 4, 'AUXILIAR', 41, 1, '2025-09-01');
 
+INSERT INTO competencia (unidade_id, descricao, base_legal) VALUES
+  (1, 'Comando político-institucional da Casa; não integra a hierarquia técnico-administrativa (art. 2º, parágrafo único)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (2, 'Dirigir os trabalhos legislativos e administrativos', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (4, 'Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (5, 'Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (6, 'Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (7, 'Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (8, 'Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (9, 'Órgão superior de direção e assessoramento técnico', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (10, 'Órgão superior de direção e assessoramento técnico', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (11, 'Órgão superior de direção e assessoramento técnico', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (12, 'Órgão superior de direção e assessoramento técnico', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (13, 'Órgão superior de direção e assessoramento técnico', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (14, 'Órgão superior de direção e assessoramento técnico', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (15, 'Órgão superior de direção e assessoramento técnico', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (16, 'Órgão superior de direção e assessoramento técnico', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (17, 'Órgão central de apoio administrativo, diretamente subordinado à Presidência (art. 15)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (18, 'Assessoramento parlamentar (3º grau); provimento por indicação dos titulares (art. 3º, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (19, 'Assessoramento parlamentar (3º grau); provimento por indicação dos titulares (art. 3º, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (20, 'Assessoramento parlamentar (3º grau); provimento por indicação dos titulares (art. 3º, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências'),
+  (21, 'Assessoramento parlamentar (3º grau); provimento por indicação dos titulares (art. 3º, §2º)', 'Lei 3.525/2025 — Dispõe sobre a organização administrativa da Câmara Municipal de Duque de Caxias, e dá outras providências');
+
 INSERT INTO simbolo (codigo, retribuicao_base, natureza) VALUES
   ('ASS-1', 6870, 'COMISSAO'),
   ('ASS-10', 3000, 'COMISSAO'),
@@ -166,4 +188,25 @@ INSERT INTO comissao_permanente (id, nome) VALUES
   (18, 'Comissão de Prevenção e Combate à Pirataria'),
   (19, 'Comissão de Defesa dos Direitos dos Idosos'),
   (20, 'Comissão de Defesa dos Direitos da Juventude');
+
+INSERT INTO tipo_processo (id, codigo, nome, dominio) VALUES
+  (1, 'PL', 'Projeto de Lei', 'LEGISLATIVO'),
+  (2, 'COMPRA', 'Contratação (Lei 14.133/2021)', 'ADMINISTRATIVO');
+
+INSERT INTO fluxo_etapa (tipo_processo_id, ordem, unidade_id, acao, prazo_dias, obrigatoria) VALUES
+  (1, 1, 3, 'Autoria e apresentação da proposição', 0, 1),
+  (1, 2, 40, 'Protocolo, autuação e numeração', 2, 1),
+  (1, 3, 9, 'Análise de constitucionalidade e técnica legislativa', 10, 1),
+  (1, 4, 21, 'Distribuição às comissões e coleta de pareceres', 15, 1),
+  (1, 5, 12, 'Inclusão em Ordem do Dia e deliberação', 5, 1),
+  (1, 6, 37, 'Redação final do autógrafo', 3, 1),
+  (1, 7, 2, 'Promulgação ou encaminhamento à sanção', 5, 1),
+  (2, 1, 40, 'Protocolo e autuação do pedido', 2, 1),
+  (2, 2, 17, 'Autorização da despesa', 3, 1),
+  (2, 3, 32, 'Termo de referência e pesquisa de preços', 10, 1),
+  (2, 4, 14, 'Parecer jurídico prévio', 7, 1),
+  (2, 5, 4, 'Condução do certame licitatório', 30, 1),
+  (2, 6, 30, 'Homologação e formalização do contrato', 5, 1),
+  (2, 7, 27, 'Empenho da despesa', 3, 1),
+  (2, 8, 36, 'Publicação do extrato', 2, 1);
 

@@ -53,7 +53,8 @@ from urllib.parse import parse_qs, urlparse
 PAGINA_WEB = Path(__file__).parent / "web" / "index.html"
 
 from sistema import (
-    autenticacao, comissoes, compras, legislativo, servicos, transparencia,
+    autenticacao, comissoes, compras, fluxo, legislativo, servicos,
+    transparencia,
 )
 from sistema.autenticacao import AcessoNegado, NaoAutenticado
 from sistema.demo import criar_banco
@@ -277,6 +278,37 @@ class Aplicacao:
         return servicos.processos_em_atraso(
             self.banco, self.query_atual.get("referencia", [""])[0])
 
+    # -------------------- fluxo e competências ---------------------
+
+    def tipos_processo(self):
+        return [
+            {"codigo": cod, "nome": nome, "dominio": dom}
+            for cod, nome, dom in self.banco.execute(
+                "SELECT codigo, nome, dominio FROM tipo_processo ORDER BY id")
+        ]
+
+    def etapas_do_tipo(self, codigo: str):
+        return fluxo.etapas(self.banco, codigo)
+
+    def competencias_da_unidade(self, unidade_id: int):
+        return fluxo.competencias_da_unidade(self.banco, unidade_id)
+
+    def vincular_tipo(self, processo_id: int, dados):
+        fluxo.vincular_tipo(self.banco, processo_id, dados["tipo"])
+        self.banco.commit()
+        return {"processo_id": processo_id, "tipo": dados["tipo"]}
+
+    def proxima_etapa(self, processo_id: int):
+        prox = fluxo.proxima_etapa(self.banco, processo_id)
+        return prox if prox is not None else {"proxima_etapa": None}
+
+    def tramitar_pelo_fluxo(self, processo_id: int, dados):
+        etapa = fluxo.tramitar_pelo_fluxo(
+            self.banco, processo_id, dados["data_envio"],
+            dados.get("despacho", ""))
+        self.banco.commit()
+        return etapa
+
     def receber_tramitacao(self, tramitacao_id: int, dados):
         servicos.receber_tramitacao(self.banco, tramitacao_id,
                                     dados["data_recebimento"])
@@ -484,6 +516,18 @@ ROTAS = [
      lambda app, m, d: app.receber_tramitacao(int(m.group(1)), d)),
     ("GET", r"^/processos/atrasados$", "PROTOCOLO",
      lambda app, m, d: app.processos_em_atraso(d)),
+    ("GET", r"^/tipos-processo$", None,
+     lambda app, m, d: app.tipos_processo()),
+    ("GET", r"^/tipos-processo/([A-Za-z0-9_-]+)/etapas$", None,
+     lambda app, m, d: app.etapas_do_tipo(m.group(1))),
+    ("GET", r"^/unidades/(\d+)/competencias$", None,
+     lambda app, m, d: app.competencias_da_unidade(int(m.group(1)))),
+    ("POST", r"^/processos/(\d+)/tipo$", "PROTOCOLO",
+     lambda app, m, d: app.vincular_tipo(int(m.group(1)), d)),
+    ("GET", r"^/processos/(\d+)/proxima-etapa$", None,
+     lambda app, m, d: app.proxima_etapa(int(m.group(1)))),
+    ("POST", r"^/processos/(\d+)/tramitar-fluxo$", "PROTOCOLO",
+     lambda app, m, d: app.tramitar_pelo_fluxo(int(m.group(1)), d)),
     ("POST", r"^/processos/(\d+)/(arquivamento|conclusao|desarquivamento)$",
      "PROTOCOLO",
      lambda app, m, d: app.situacao_processo(int(m.group(1)), m.group(2))),

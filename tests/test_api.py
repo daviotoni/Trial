@@ -219,6 +219,47 @@ class TestAPI(unittest.TestCase):
              "resultado_simbolico": "APROVADA"})
         self.assertEqual(codigo, 422)
 
+    def test_fluxo_processual(self):
+        # Rito configurado é público (transparência).
+        codigo, tipos = requisitar(self.base, "GET", "/tipos-processo")
+        self.assertEqual(codigo, 200)
+        codigos = {t["codigo"] for t in tipos}
+        self.assertIn("PL", codigos)
+        self.assertIn("COMPRA", codigos)
+
+        codigo, etapas = requisitar(
+            self.base, "GET", "/tipos-processo/COMPRA/etapas")
+        self.assertEqual(codigo, 200)
+        self.assertEqual(etapas[0]["unidade"],
+                         "Coordenadoria da Secretaria-Geral")
+
+        # Autua um processo, vincula ao rito e encaminha automaticamente.
+        _, proc = requisitar(self.base, "POST", "/processos", {
+            "tipo": "ADMINISTRATIVO", "assunto": "Compra de material",
+            "unidade_origem_id": etapas[0]["unidade_id"],
+            "data_autuacao": "2025-09-10"})
+        codigo, _ = requisitar(
+            self.base, "POST", f"/processos/{proc['id']}/tipo",
+            {"tipo": "COMPRA"})
+        self.assertEqual(codigo, 200)
+
+        codigo, prox = requisitar(
+            self.base, "GET", f"/processos/{proc['id']}/proxima-etapa")
+        self.assertEqual(codigo, 200)
+        self.assertEqual(prox["unidade"], "Diretoria-Geral")
+
+        codigo, etapa = requisitar(
+            self.base, "POST", f"/processos/{proc['id']}/tramitar-fluxo",
+            {"data_envio": "2025-09-10"})
+        self.assertEqual(codigo, 200)
+        self.assertEqual(etapa["unidade"], "Diretoria-Geral")
+
+        # Competências de uma unidade são consulta pública.
+        codigo, comps = requisitar(
+            self.base, "GET",
+            f"/unidades/{etapas[0]['unidade_id']}/competencias")
+        self.assertEqual(codigo, 200)
+
     def test_escrita_sem_login_retorna_401(self):
         codigo, erro = requisitar(self.base, "POST", "/processos", {
             "tipo": "ADMINISTRATIVO", "assunto": "X",

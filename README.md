@@ -63,6 +63,7 @@ sistema/
   demo.py         # cria o banco e roda consultas de verificação
   legislativo.py  # proposições, sessões, pauta e votações
   comissoes.py    # relatoria e pareceres de comissão (art. 33 do Regimento)
+  fluxo.py        # competências legais + ritos configuráveis por tipo de processo
 docs/
   pesquisa-estrutura-cmdc.md      # relatório de pesquisa com fontes verificadas
   modelo-de-dados.md              # desenho do banco: módulos, entidades, regras
@@ -147,6 +148,32 @@ mas aprovado, libera a deliberação). Há controle de relatorias em atraso
 (prazo vencido). Demonstração: `python -m sistema.comissoes`. A tramitação
 de processos também passou a aceitar **prazo (SLA)** por passagem, com a
 consulta `processos_em_atraso` (rota `GET /processos/atrasados`).
+
+`sistema/fluxo.py` é a base de um sistema **interligado entre setores**, em
+que cada unidade faz só o que a lei lhe atribui e remete ao setor seguinte:
+
+- **Competências no banco** — a Lei 3.525/2025 traduzida em regra: cada
+  unidade tem suas `Competencia` (fonte: `orgao/cmdc.py`) persistidas na
+  tabela `competencia`.
+- **Ritos configuráveis** — cada `tipo_processo` tem um fluxo em etapas
+  (`fluxo_etapa`), e cada etapa é a passagem por uma unidade real, com a
+  ação e o prazo (SLA) sugerido. O caminho é **dado, não fixo no código**:
+  dá para criar tipos e etapas sem alterar o programa. Vêm semeados dois
+  ritos reais — **PL** (Gabinetes → Secretaria-Geral → Consultoria →
+  Comissões → Plenário → Redação → Presidência) e **COMPRA** da Lei
+  14.133/2021 (Protocolo → Diretoria → Material → Procuradoria → CPL →
+  Contratos → Contabilidade → Publicações).
+- **Encaminhamento automático** — `tramitar_pelo_fluxo` leva o processo à
+  próxima etapa calculando o prazo pela etapa; `proxima_etapa` diz para
+  onde ele deve seguir a partir de onde está.
+
+Demonstração: `python -m sistema.fluxo` (imprime os ritos e simula um PL
+percorrendo todos os setores). Rotas: `GET /tipos-processo`,
+`GET /tipos-processo/{codigo}/etapas`, `GET /unidades/{id}/competencias`,
+`POST /processos/{id}/tipo`, `GET /processos/{id}/proxima-etapa`,
+`POST /processos/{id}/tramitar-fluxo`. Este é o primeiro passo de uma
+evolução em fases rumo ao acesso por unidade (cada setor só o seu) com
+trava por competência.
 
 `sistema/compras.py` implementa o fluxo da Lei 14.133/2021: abertura de
 contratação com autuação automática, limites de dispensa do art. 75,

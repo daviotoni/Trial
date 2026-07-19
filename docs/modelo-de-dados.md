@@ -135,6 +135,19 @@ Coordenadorias de Compras, Licitações e Contratos, Contabilidade e Finanças.
 - `publicacao`: o que foi publicado no portal da transparência, quando e onde
   (Coordenadoria de Publicações e Transparência / LAI).
 
+### 9. Competências legais e fluxo processual (`competencia`, `tipo_processo`, `fluxo_etapa`)
+
+Traduz a Lei 3.525/2025 em regra operacional, base de um sistema
+interligado entre setores. `competencia` guarda o que a lei atribui a cada
+unidade (persistida a partir de `orgao/cmdc.py`). `tipo_processo` define um
+rito, e `fluxo_etapa` as suas etapas ordenadas — cada etapa é a passagem
+por uma unidade real, com a ação executada e o prazo (SLA) sugerido. O
+processo pode ser vinculado a um tipo (`processo.tipo_processo_id`) e então
+navegado etapa a etapa: `proxima_etapa` diz para onde seguir e
+`tramitar_pelo_fluxo` encaminha automaticamente. O rito é **dado
+configurável**, não código: cria-se tipo e etapas sem alterar o programa.
+Vêm semeados dois ritos reais (PL e COMPRA da Lei 14.133/2021).
+
 ## Decisões de projeto
 
 1. **SQL portável**: sem tipos proprietários; roda hoje em SQLite (estudo,
