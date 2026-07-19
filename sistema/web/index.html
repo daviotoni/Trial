@@ -553,6 +553,8 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   if (!aba) return;
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("ativa", b === evento.target));
   document.querySelectorAll("main section").forEach(s => s.classList.toggle("ativa", s.id === aba));
+  // Carrega a lista de setores e de usuários ao abrir a aba Usuários.
+  if (aba === "usuarios") { carregarUnidadesUsuario(); carregarUsuarios(); }
 });
 
 // Painel
