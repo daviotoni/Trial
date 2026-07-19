@@ -1,0 +1,3 @@
+# O Sistema de Gestão da CMDC usa apenas a biblioteca padrão do Python.
+# Não há dependências externas — este arquivo existe só para o build
+# das plataformas de deploy reconhecerem o projeto como Python.

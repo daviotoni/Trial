@@ -99,6 +99,7 @@ legislativo, compras e controle/transparência), documentado em
 python -m sistema.demo      # cria o banco (SQLite) com schema + seed e verifica
 python -m sistema.cenario   # estudo de caso: nomeações, tramitação e folha
 python -m sistema.api       # API REST em http://127.0.0.1:8000 (banco cmdc.db)
+                            # publicar num servidor: veja DEPLOY.md
 python -m sistema.gerar_seed > sistema/seed.sql   # regenera a carga inicial
 ```
 

@@ -24,8 +24,14 @@ def criar_banco(caminho: str = ":memory:",
     """
     conexao = sqlite3.connect(caminho, check_same_thread=not multithread)
     conexao.execute("PRAGMA foreign_keys = ON")
-    conexao.executescript((RAIZ / "schema.sql").read_text())
-    conexao.executescript(gerar())
+    # Idempotente: só cria schema + seed se o banco ainda estiver vazio.
+    # Permite reiniciar o servidor sobre um arquivo já existente (produção).
+    ja_iniciado = conexao.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'unidade'"
+    ).fetchone()
+    if not ja_iniciado:
+        conexao.executescript((RAIZ / "schema.sql").read_text())
+        conexao.executescript(gerar())
     return conexao
 
 

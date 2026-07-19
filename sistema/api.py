@@ -669,7 +669,8 @@ ROTAS = [
 ]
 
 
-def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:"):
+def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:",
+                        host: str = "127.0.0.1"):
     aplicacao = Aplicacao(caminho_banco)
 
     class Handler(BaseHTTPRequestHandler):
@@ -744,22 +745,28 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:"):
         def log_message(self, *args):  # silencia o log padrão nos testes
             pass
 
-    servidor = ThreadingHTTPServer(("127.0.0.1", porta), Handler)
+    servidor = ThreadingHTTPServer((host, porta), Handler)
     servidor.aplicacao = aplicacao
     return servidor
 
 
 def main() -> None:
     import argparse
+    import os
 
     parser = argparse.ArgumentParser(description="API do sistema CMDC")
-    parser.add_argument("--porta", type=int, default=8000)
-    parser.add_argument("--banco", default="cmdc.db",
-                        help="arquivo SQLite (padrão: cmdc.db)")
+    # PORT/HOST/CMDC_DB vêm do ambiente em produção (Render define PORT).
+    parser.add_argument("--porta", type=int,
+                        default=int(os.environ.get("PORT", 8000)))
+    parser.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0"))
+    parser.add_argument("--banco", default=os.environ.get("CMDC_DB", "cmdc.db"),
+                        help="arquivo SQLite (padrão: cmdc.db; use um disco "
+                             "persistente em produção)")
     argumentos = parser.parse_args()
 
-    servidor = criar_servidor_http(argumentos.porta, argumentos.banco)
-    print(f"API do sistema CMDC em http://127.0.0.1:{argumentos.porta}")
+    servidor = criar_servidor_http(argumentos.porta, argumentos.banco,
+                                   host=argumentos.host)
+    print(f"API do sistema CMDC ouvindo em {argumentos.host}:{argumentos.porta}")
     print("Login inicial: admin /", autenticacao.SENHA_INICIAL_ADMIN,
           "(troque criando novos usuários via POST /usuarios)")
     print("Rotas:", ", ".join(sorted({f"{v} {p}" for v, p, _, _ in ROTAS})))

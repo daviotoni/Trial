@@ -1,0 +1,16 @@
+# Blueprint de deploy no Render (https://render.com) — serviço web gratuito
+# que instala direto do GitHub. Passo a passo: veja DEPLOY.md.
+services:
+  - type: web
+    name: sistema-cmdc
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m sistema.api
+    autoDeploy: true
+    # Para dados que PERSISTEM entre reinícios, adicione um disco pago e
+    # defina CMDC_DB=/data/cmdc.db (veja DEPLOY.md). Sem disco, o banco é
+    # recriado a cada reinício (ok para piloto/demonstração).
+    # envVars:
+    #   - key: ADMIN_SENHA_INICIAL   # senha inicial do admin (opcional)
+    #     sync: false

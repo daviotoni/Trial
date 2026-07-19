@@ -17,6 +17,7 @@ Demonstração: python -m sistema.autenticacao
 from __future__ import annotations
 
 import hashlib
+import os
 import secrets
 import sqlite3
 
@@ -36,7 +37,9 @@ PERFIS = {
     "CONTROLE": {"CONTROLE", "TRANSPARENCIA", "FOLHA"},
 }
 
-SENHA_INICIAL_ADMIN = "cmdc@2026"  # trocar no primeiro acesso
+# Senha inicial do admin. Em produção, defina ADMIN_SENHA_INICIAL no
+# ambiente; sem ela, usa o padrão documentado (troque no primeiro acesso).
+SENHA_INICIAL_ADMIN = os.environ.get("ADMIN_SENHA_INICIAL", "cmdc@2026")
 
 
 class AcessoNegado(Exception):
