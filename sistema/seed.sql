@@ -291,6 +291,8 @@ INSERT INTO fluxo_etapa (tipo_processo_id, ordem, unidade_id, acao, prazo_dias, 
 INSERT INTO unidade_area (unidade_id, area) VALUES
   (2, 'LEGISLATIVO'),
   (1, 'LEGISLATIVO'),
+  (14, 'JURIDICO'),
+  (9, 'JURIDICO'),
   (40, 'PROTOCOLO'),
   (38, 'PESSOAL'),
   (38, 'FOLHA'),

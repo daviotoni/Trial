@@ -2,7 +2,7 @@
 
 import unittest
 
-from sistema import autenticacao, servicos
+from sistema import autenticacao, fluxo, servicos
 from sistema.autenticacao import AcessoNegado
 from sistema.demo import criar_banco
 
@@ -50,6 +50,18 @@ class TestAcessoPorUnidade(unittest.TestCase):
         u = self._usuario("rh1", "RH", "Coordenadoria de Recursos Humanos")
         self.assertEqual(
             autenticacao.areas_do_usuario(self.banco, u), {"PESSOAL", "FOLHA"})
+
+    def test_procuradoria_escopo_juridico(self):
+        # Cada setor tem seu login preso à lotação e às suas atividades.
+        u = self._usuario("proc.legal", "CONTROLE", "Procuradoria-Geral")
+        self.assertEqual(
+            autenticacao.areas_do_usuario(self.banco, u), {"JURIDICO"})
+        # A Procuradoria não opera compras nem folha.
+        with self.assertRaises(AcessoNegado):
+            autenticacao.exigir(self.banco, u, "COMPRAS")
+        # Tem competência própria (art. 19).
+        comps = fluxo.competencias_da_unidade(self.banco, u["unidade_id"])
+        self.assertTrue(any("art. 19" in c["descricao"] for c in comps))
 
     def test_admin_e_superusuario(self):
         u = self._usuario("adm", "ADMIN")  # sem unidade

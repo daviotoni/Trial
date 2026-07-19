@@ -42,6 +42,8 @@ VEREADORES_20A_LEGISLATURA = [
 UNIDADE_AREAS = {
     "Presidência": ["LEGISLATIVO"],
     "Mesa Diretora": ["LEGISLATIVO"],
+    "Procuradoria-Geral": ["JURIDICO"],
+    "Consultoria-Geral Legislativa": ["JURIDICO"],
     "Coordenadoria da Secretaria-Geral": ["PROTOCOLO"],
     "Coordenadoria de Recursos Humanos": ["PESSOAL", "FOLHA"],
     "Departamento do e-Social": ["FOLHA"],

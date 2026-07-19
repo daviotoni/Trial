@@ -400,7 +400,8 @@ CREATE TABLE unidade_area (
     unidade_id INTEGER NOT NULL REFERENCES unidade (id),
     area       TEXT NOT NULL CHECK (area IN
                  ('PESSOAL', 'FOLHA', 'PROTOCOLO', 'LEGISLATIVO',
-                  'COMPRAS', 'TRANSPARENCIA', 'CONTROLE', 'USUARIOS')),
+                  'COMPRAS', 'TRANSPARENCIA', 'CONTROLE', 'JURIDICO',
+                  'USUARIOS')),
     PRIMARY KEY (unidade_id, area)
 );
 
