@@ -118,21 +118,44 @@
 
 <section id="nova-proposicao">
   <div class="cartao">
-    <h2>Apresentar proposição <small id="np-setor" style="font-weight:normal"></small></h2>
-    <p style="color:#555">Inicie uma proposição de autoria do seu setor. Ela entra na sua <b>caixa</b> para ser encaminhada pelo rito.</p>
+    <h2>Nova proposição <small id="np-setor" style="font-weight:normal"></small></h2>
+    <p style="color:#555">Trabalhe em <b>rascunho</b> (sem número, visível só ao seu gabinete) e
+      <b>protocole</b> quando pronta — a numeração oficial nasce no protocolo.
+      Justificativa é obrigatória para protocolar (art. 88, §4º); projetos exigem o texto articulado (art. 92).</p>
     <label>Tipo</label>
-    <select id="np-tipo">
-      <option value="PL">PL — Projeto de Lei</option>
-      <option value="PDL">PDL — Projeto de Decreto Legislativo</option>
-      <option value="PR">PR — Projeto de Resolução</option>
-      <option value="REQUERIMENTO">Requerimento</option>
-      <option value="INDICACAO">Indicação</option>
-      <option value="MOCAO">Moção</option>
-    </select>
-    <label>Ementa / assunto</label>
+    <select id="np-tipo"></select>
+    <small id="np-base" style="color:#667"></small>
+    <div id="np-bloco-subtipo" style="display:none">
+      <label>Espécie</label>
+      <select id="np-subtipo"></select>
+    </div>
+    <label>Ementa</label>
     <textarea id="np-ementa" rows="2" placeholder="Ex.: Institui a Semana Municipal do Livro."></textarea>
-    <button class="acao" id="btn-apresentar">Apresentar proposição</button>
+    <label>Texto <small id="np-texto-dica" style="color:#667"></small></label>
+    <textarea id="np-texto" rows="5" placeholder="Art. 1º ...&#10;Art. 2º Esta Lei entra em vigor na data de sua publicação."></textarea>
+    <label>Justificativa</label>
+    <textarea id="np-justificativa" rows="3" placeholder="Exponha as razões da proposição (art. 88, §4º)."></textarea>
+    <label>Regime de tramitação (art. 91)</label>
+    <select id="np-regime">
+      <option value="ORDINARIA">Ordinária</option>
+      <option value="PRIORIDADE">Prioridade</option>
+      <option value="ESPECIAL">Tramitação especial</option>
+      <option value="URGENCIA">Urgência</option>
+    </select>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button class="acao" id="btn-salvar-rascunho">Salvar rascunho</button>
+      <button class="acao" id="btn-protocolar">Protocolar</button>
+      <button class="acao" id="btn-cancelar-edicao" style="display:none; background:#666">Cancelar edição</button>
+    </div>
     <p id="msg-np" class="msg"></p>
+  </div>
+  <div class="cartao">
+    <h2>Rascunhos do gabinete</h2>
+    <p id="rascunhos-vazio" style="display:none; color:#555">Nenhum rascunho — comece uma proposição acima.</p>
+    <table id="tabela-rascunhos" style="display:none">
+      <thead><tr><th>Tipo</th><th>Ementa</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
   </div>
 </section>
 
@@ -555,18 +578,145 @@ document.getElementById("btn-criar-usuario").addEventListener("click", async () 
   } catch (e) { mostrar("msg-usuario", e.message, "erro"); }
 });
 
-// ----- Nova proposição (o setor apresenta) -----
-document.getElementById("btn-apresentar").addEventListener("click", async () => {
-  const tipo = document.getElementById("np-tipo").value;
-  const ementa = document.getElementById("np-ementa").value.trim();
-  if (!ementa) { mostrar("msg-np", "Escreva a ementa/assunto.", "erro"); return; }
+// ----- Nova proposição: catálogo, rascunhos e protocolo -----
+let catalogoNP = [];
+let npEditando = null;  // id do rascunho em edição
+
+const tipoAtualNP = () => catalogoNP.find(
+  t => t.codigo === document.getElementById("np-tipo").value);
+
+const aoTrocarTipoNP = () => {
+  const meta = tipoAtualNP();
+  if (!meta) return;
+  document.getElementById("np-base").textContent =
+    "Base regimental: " + meta.base;
+  document.getElementById("np-texto-dica").textContent =
+    meta.exige_texto ? "(obrigatório para protocolar — art. 92)" : "(opcional)";
+  const bloco = document.getElementById("np-bloco-subtipo");
+  const sel = document.getElementById("np-subtipo");
+  if (meta.subtipos) {
+    sel.innerHTML = Object.entries(meta.subtipos).map(
+      ([k, d]) => `<option value="${k}">${k.replace(/_/g, " ")} — ${d}</option>`).join("");
+    bloco.style.display = "";
+  } else { bloco.style.display = "none"; }
+};
+
+const carregarCatalogoNP = async () => {
+  if (catalogoNP.length) return;
+  catalogoNP = await consultar("/tipos-proposicao");
+  document.getElementById("np-tipo").innerHTML = catalogoNP.map(
+    t => `<option value="${t.codigo}">${t.codigo} — ${t.nome}</option>`).join("");
+  aoTrocarTipoNP();
+};
+document.getElementById("np-tipo").addEventListener("change", aoTrocarTipoNP);
+
+const dadosFormNP = () => {
+  const meta = tipoAtualNP() || {};
+  return {
+    tipo: document.getElementById("np-tipo").value,
+    subtipo: meta.subtipos ? document.getElementById("np-subtipo").value : null,
+    ementa: document.getElementById("np-ementa").value.trim(),
+    texto: document.getElementById("np-texto").value.trim() || null,
+    justificativa: document.getElementById("np-justificativa").value.trim() || null,
+    regime: document.getElementById("np-regime").value,
+  };
+};
+
+const limparFormNP = () => {
+  npEditando = null;
+  ["np-ementa", "np-texto", "np-justificativa"].forEach(
+    id => document.getElementById(id).value = "");
+  document.getElementById("np-regime").value = "ORDINARIA";
+  document.getElementById("btn-cancelar-edicao").style.display = "none";
+  document.getElementById("btn-salvar-rascunho").textContent = "Salvar rascunho";
+};
+
+const carregarRascunhos = async () => {
+  const tabela = document.getElementById("tabela-rascunhos");
+  const vazio = document.getElementById("rascunhos-vazio");
+  if (!localStorage.getItem("unidade_id")) {
+    tabela.style.display = "none"; vazio.style.display = ""; return;
+  }
+  try {
+    const lista = await consultar("/rascunhos");
+    const corpo = tabela.querySelector("tbody");
+    corpo.innerHTML = "";
+    if (!lista.length) { tabela.style.display = "none"; vazio.style.display = ""; return; }
+    vazio.style.display = "none"; tabela.style.display = "";
+    lista.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${r.tipo}${r.subtipo ? " · " + r.subtipo.replace(/_/g, " ") : ""}</td>` +
+        `<td>${r.ementa}</td><td style="white-space:nowrap"></td>`;
+      const celula = tr.lastChild;
+      const botao = (rotulo, fn) => {
+        const b = document.createElement("button");
+        b.className = "acao"; b.style.marginRight = "6px";
+        b.textContent = rotulo; b.addEventListener("click", fn);
+        celula.appendChild(b);
+      };
+      botao("Editar", () => {
+        npEditando = r.id;
+        document.getElementById("np-tipo").value = r.tipo; aoTrocarTipoNP();
+        if (r.subtipo) document.getElementById("np-subtipo").value = r.subtipo;
+        document.getElementById("np-ementa").value = r.ementa || "";
+        document.getElementById("np-texto").value = r.texto || "";
+        document.getElementById("np-justificativa").value = r.justificativa || "";
+        document.getElementById("np-regime").value = r.regime || "ORDINARIA";
+        document.getElementById("btn-cancelar-edicao").style.display = "";
+        document.getElementById("btn-salvar-rascunho").textContent = "Salvar alterações";
+        window.scrollTo({top: 0, behavior: "smooth"});
+      });
+      botao("Protocolar", async () => {
+        try {
+          const hoje = new Date().toISOString().slice(0, 10);
+          const resp = await enviar(`/rascunhos/${r.id}/protocolo`, {data: hoje});
+          mostrar("msg-np", `${resp.rotulo} protocolada — está na sua caixa.`, "ok");
+          carregarRascunhos(); carregarCaixa(); carregarProposicoes();
+        } catch (e) { mostrar("msg-np", e.message, "erro"); }
+      });
+      botao("Excluir", async () => {
+        try {
+          await enviar(`/rascunhos/${r.id}/exclusao`, {});
+          if (npEditando === r.id) limparFormNP();
+          carregarRascunhos();
+        } catch (e) { mostrar("msg-np", e.message, "erro"); }
+      });
+      corpo.appendChild(tr);
+    });
+  } catch (e) { tabela.style.display = "none"; vazio.style.display = ""; }
+};
+
+document.getElementById("btn-salvar-rascunho").addEventListener("click", async () => {
+  const dados = dadosFormNP();
+  if (!dados.ementa) { mostrar("msg-np", "Escreva a ementa.", "erro"); return; }
+  try {
+    if (npEditando) {
+      await enviar(`/rascunhos/${npEditando}`, dados);
+      mostrar("msg-np", "Rascunho atualizado.", "ok");
+    } else {
+      await enviar("/rascunhos", dados);
+      mostrar("msg-np", "Rascunho salvo — protocole quando estiver pronto.", "ok");
+    }
+    limparFormNP(); carregarRascunhos();
+  } catch (e) { mostrar("msg-np", e.message, "erro"); }
+});
+
+document.getElementById("btn-protocolar").addEventListener("click", async () => {
+  const dados = dadosFormNP();
+  if (!dados.ementa) { mostrar("msg-np", "Escreva a ementa.", "erro"); return; }
   try {
     const hoje = new Date().toISOString().slice(0, 10);
-    const r = await enviar("/minhas-proposicoes", {tipo, ementa, data: hoje});
-    mostrar("msg-np", `Proposição ${r.rotulo} apresentada — está na sua caixa.`, "ok");
-    document.getElementById("np-ementa").value = "";
-    carregarCaixa(); carregarProposicoes();
+    let id = npEditando;
+    if (id) await enviar(`/rascunhos/${id}`, dados);
+    else id = (await enviar("/rascunhos", dados)).id;
+    const resp = await enviar(`/rascunhos/${id}/protocolo`, {data: hoje});
+    mostrar("msg-np", `${resp.rotulo} protocolada — está na sua caixa para encaminhar.`, "ok");
+    limparFormNP(); carregarRascunhos(); carregarCaixa(); carregarProposicoes();
   } catch (e) { mostrar("msg-np", e.message, "erro"); }
+});
+
+document.getElementById("btn-cancelar-edicao").addEventListener("click", () => {
+  limparFormNP(); mostrar("msg-np", "Edição cancelada.", "ok");
 });
 
 document.getElementById("btn-login").addEventListener("click", async () => {
@@ -605,6 +755,8 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   document.querySelectorAll("main section").forEach(s => s.classList.toggle("ativa", s.id === aba));
   // Carrega a lista de setores e de usuários ao abrir a aba Usuários.
   if (aba === "usuarios") { carregarUnidadesUsuario(); carregarUsuarios(); }
+  // Catálogo regimental e rascunhos ao abrir a aba Nova proposição.
+  if (aba === "nova-proposicao") { carregarCatalogoNP(); carregarRascunhos(); }
 });
 
 // Painel

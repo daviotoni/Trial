@@ -54,6 +54,50 @@ COMISSOES_PERMANENTES_REGIMENTAIS = [
 # (art. 178 do Regimento: Projetos de Lei Complementar à Lei Orgânica).
 TIPOS_MAIORIA_ABSOLUTA = {"PLC"}
 
+# Catálogo das proposições que um gabinete pode apresentar (art. 87, §1º,
+# e arts. 96-113 do Regimento Interno). `exige_texto` marca os projetos,
+# que precisam de texto articulado (art. 92); `subtipos` são as espécies
+# regimentais que a proposição deve declarar.
+CATALOGO_PROPOSICOES = {
+    "PELO": {"nome": "Proposta de Emenda à Lei Orgânica",
+             "exige_texto": True, "subtipos": None,
+             "base": "art. 87, §1º"},
+    "PLC": {"nome": "Projeto de Lei Complementar à Lei Orgânica",
+            "exige_texto": True, "subtipos": None,
+            "base": "art. 87, §1º; art. 178 (maioria absoluta)"},
+    "PL": {"nome": "Projeto de Lei", "exige_texto": True, "subtipos": None,
+           "base": "arts. 92 e 96"},
+    "PR": {"nome": "Projeto de Resolução", "exige_texto": True,
+           "subtipos": None, "base": "art. 100"},
+    "PDL": {"nome": "Projeto de Decreto Legislativo", "exige_texto": True,
+            "subtipos": None, "base": "art. 99"},
+    "INDICACAO": {"nome": "Indicação", "exige_texto": False,
+                  "subtipos": {
+                      "SIMPLES": "Encaminhada pelo Presidente ao Executivo "
+                                 "(art. 102)",
+                      "LEGISLATIVA": "Encaminhada à Comissão de Justiça "
+                                     "(art. 103)"},
+                  "base": "arts. 101-104"},
+    "REQUERIMENTO": {"nome": "Requerimento", "exige_texto": False,
+                     "subtipos": {
+                         "DESPACHO_PRESIDENTE": "Sujeito a despacho do "
+                                                "Presidente (arts. 108-110)",
+                         "DELIBERACAO_PLENARIO": "Sujeito a deliberação do "
+                                                 "Plenário (arts. 111-113)"},
+                     "base": "art. 107"},
+    "MOCAO": {"nome": "Moção", "exige_texto": False,
+              "subtipos": {
+                  "APLAUSO": "Aplauso/louvor",
+                  "CONGRATULACOES": "Congratulações",
+                  "PESAR": "Pesar",
+                  "REPUDIO": "Repúdio",
+                  "DESAPROVACAO": "Desaprovação (exige 1/3 — colher em "
+                                  "papel nesta fase)"},
+              "base": "arts. 105-106"},
+}
+
+REGIMES_TRAMITACAO = {"ORDINARIA", "PRIORIDADE", "ESPECIAL", "URGENCIA"}
+
 
 # ------------------------------------------------------------------
 # Parlamentares e legislaturas
@@ -125,6 +169,174 @@ def apresentar_proposicao(
 # Sessões, pauta e votação
 # ------------------------------------------------------------------
 
+# ------------------------------------------------------------------
+# Gabinete: rascunhos e protocolo (arts. 87-92 do Regimento)
+# ------------------------------------------------------------------
+
+def parlamentar_do_gabinete(banco: sqlite3.Connection,
+                            unidade_id: int) -> int | None:
+    """Vereador titular do gabinete (mandato mais recente), ou None."""
+    linha = banco.execute(
+        "SELECT parlamentar_id FROM mandato WHERE gabinete_unidade_id = ? "
+        "ORDER BY legislatura_id DESC LIMIT 1", (unidade_id,),
+    ).fetchone()
+    return linha[0] if linha else None
+
+
+def _validar_tipo_e_subtipo(tipo: str, subtipo: str | None,
+                            regime: str) -> dict:
+    meta = CATALOGO_PROPOSICOES.get(tipo)
+    if meta is None:
+        raise RegraViolada(
+            "tipo de proposição inválido para apresentação pelo gabinete")
+    if regime not in REGIMES_TRAMITACAO:
+        raise RegraViolada("regime deve ser ORDINARIA, PRIORIDADE, "
+                           "ESPECIAL ou URGENCIA (art. 91)")
+    if subtipo and (not meta["subtipos"] or subtipo not in meta["subtipos"]):
+        raise RegraViolada(f"subtipo inválido para {tipo}")
+    return meta
+
+
+def criar_rascunho(
+    banco: sqlite3.Connection,
+    unidade_id: int,
+    tipo: str,
+    ementa: str,
+    subtipo: str | None = None,
+    texto: str | None = None,
+    justificativa: str | None = None,
+    regime: str = "ORDINARIA",
+) -> int:
+    """Cria um rascunho do gabinete: sem número, visível só ao setor autor.
+
+    O rascunho exige apenas a ementa; texto e justificativa são cobrados
+    no protocolo (arts. 88, §4º, e 92).
+    """
+    _validar_tipo_e_subtipo(tipo, subtipo, regime)
+    if not ementa or not ementa.strip():
+        raise RegraViolada("a ementa é obrigatória (art. 87, §3º)")
+    return banco.execute(
+        "INSERT INTO proposicao (tipo, subtipo, ementa, texto, "
+        "justificativa, regime, unidade_autora_id, situacao) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, 'RASCUNHO')",
+        (tipo, subtipo, ementa.strip(), texto, justificativa, regime,
+         unidade_id),
+    ).lastrowid
+
+
+def _rascunho_do_setor(banco, rascunho_id, unidade_id):
+    linha = banco.execute(
+        "SELECT situacao, unidade_autora_id FROM proposicao WHERE id = ?",
+        (rascunho_id,),
+    ).fetchone()
+    if linha is None:
+        raise RegraViolada("rascunho inexistente")
+    situacao, autora = linha
+    if situacao != "RASCUNHO":
+        raise RegraViolada("a proposição já foi protocolada")
+    if autora != unidade_id:
+        raise RegraViolada("o rascunho pertence a outro gabinete")
+
+
+def atualizar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
+                       unidade_id: int, **campos) -> None:
+    """Edita um rascunho do próprio gabinete (tipo, subtipo, ementa,
+    texto, justificativa, regime)."""
+    _rascunho_do_setor(banco, rascunho_id, unidade_id)
+    permitidos = {"tipo", "subtipo", "ementa", "texto", "justificativa",
+                  "regime"}
+    atualizacao = {c: v for c, v in campos.items() if c in permitidos}
+    if not atualizacao:
+        return
+    atual = banco.execute(
+        "SELECT tipo, subtipo, regime FROM proposicao WHERE id = ?",
+        (rascunho_id,),
+    ).fetchone()
+    tipo = atualizacao.get("tipo", atual[0])
+    subtipo = atualizacao.get("subtipo", atual[1])
+    regime = atualizacao.get("regime", atual[2]) or "ORDINARIA"
+    _validar_tipo_e_subtipo(tipo, subtipo, regime)
+    sets = ", ".join(f"{c} = ?" for c in atualizacao)
+    banco.execute(
+        f"UPDATE proposicao SET {sets} WHERE id = ?",
+        (*atualizacao.values(), rascunho_id),
+    )
+
+
+def excluir_rascunho(banco: sqlite3.Connection, rascunho_id: int,
+                     unidade_id: int) -> None:
+    """Exclui um rascunho do próprio gabinete (nunca matéria protocolada)."""
+    _rascunho_do_setor(banco, rascunho_id, unidade_id)
+    banco.execute("DELETE FROM proposicao WHERE id = ?", (rascunho_id,))
+
+
+def rascunhos_do_setor(banco: sqlite3.Connection,
+                       unidade_id: int) -> list[dict]:
+    """Rascunhos do gabinete, do mais recente para o mais antigo."""
+    return [
+        {"id": pid, "tipo": tipo, "subtipo": subtipo, "ementa": ementa,
+         "texto": texto, "justificativa": justificativa, "regime": regime}
+        for pid, tipo, subtipo, ementa, texto, justificativa, regime in
+        banco.execute(
+            "SELECT id, tipo, subtipo, ementa, texto, justificativa, regime "
+            "FROM proposicao WHERE situacao = 'RASCUNHO' AND "
+            "unidade_autora_id = ? ORDER BY id DESC", (unidade_id,),
+        )
+    ]
+
+
+def protocolar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
+                        unidade_id: int, data: str) -> tuple[int, str]:
+    """Protocola o rascunho: valida, numera, autua e define o autor.
+
+    Validações do Regimento: justificativa obrigatória (art. 88, §4º),
+    texto articulado para projetos (art. 92) e subtipo para as espécies
+    que o exigem. A numeração sequencial por tipo/ano nasce aqui; o
+    processo é autuado com origem no gabinete e entra no rito quando o
+    tipo tiver fluxo configurado. Autor = vereador titular do gabinete.
+    """
+    from sistema import fluxo as fluxo_mod
+
+    _rascunho_do_setor(banco, rascunho_id, unidade_id)
+    tipo, subtipo, ementa, texto, justificativa = banco.execute(
+        "SELECT tipo, subtipo, ementa, texto, justificativa "
+        "FROM proposicao WHERE id = ?", (rascunho_id,),
+    ).fetchone()
+    meta = CATALOGO_PROPOSICOES[tipo]
+    if not justificativa or not justificativa.strip():
+        raise RegraViolada(
+            "a justificativa é obrigatória para protocolar (art. 88, §4º)")
+    if meta["exige_texto"] and (not texto or not texto.strip()):
+        raise RegraViolada(
+            "projetos exigem o texto articulado (art. 92)")
+    if meta["subtipos"] and not subtipo:
+        raise RegraViolada(
+            f"{meta['nome']} exige a espécie (subtipo): "
+            + ", ".join(meta["subtipos"]))
+
+    ano = int(data[:4])
+    (ultimo,) = banco.execute(
+        "SELECT COALESCE(MAX(numero), 0) FROM proposicao "
+        "WHERE tipo = ? AND ano = ?", (tipo, ano),
+    ).fetchone()
+    numero = ultimo + 1
+    rotulo = f"{tipo} {numero}/{ano}"
+
+    processo_id, _ = autuar_processo(
+        banco, "LEGISLATIVO", f"{rotulo} — {ementa}", unidade_id, data)
+    if banco.execute("SELECT 1 FROM tipo_processo WHERE codigo = ?",
+                     (tipo,)).fetchone():
+        fluxo_mod.vincular_tipo(banco, processo_id, tipo)
+
+    banco.execute(
+        "UPDATE proposicao SET numero = ?, ano = ?, processo_id = ?, "
+        "autor_parlamentar_id = ?, situacao = 'EM_TRAMITACAO' WHERE id = ?",
+        (numero, ano, processo_id,
+         parlamentar_do_gabinete(banco, unidade_id), rascunho_id),
+    )
+    return rascunho_id, rotulo
+
+
 def convocar_sessao(banco: sqlite3.Connection, tipo: str, data: str) -> tuple[int, int]:
     """Convoca sessão numerada sequencialmente por tipo/ano. Devolve (id, número)."""
     ano = data[:4]
@@ -150,11 +362,13 @@ def pautar(banco: sqlite3.Connection, sessao_id: int, proposicao_id: int,
     (pareceres podem ser proferidos oralmente em Plenário).
     """
     linha = banco.execute(
-        "SELECT tipo FROM proposicao WHERE id = ?", (proposicao_id,)
+        "SELECT tipo, situacao FROM proposicao WHERE id = ?", (proposicao_id,)
     ).fetchone()
     if linha is None:
         raise RegraViolada("proposição inexistente")
-    tipo_proposicao = linha[0]
+    tipo_proposicao, situacao_proposicao = linha
+    if situacao_proposicao == "RASCUNHO":
+        raise RegraViolada("rascunho não protocolado não entra em pauta")
     if not urgencia and comissoes.exige_parecer(tipo_proposicao) \
             and not comissoes.tem_parecer_aprovado(banco, proposicao_id):
         raise RegraViolada(
@@ -216,9 +430,20 @@ def votar(
         sim = sum(1 for valor in votos.values() if valor == "SIM")
         nao = sum(1 for valor in votos.values() if valor == "NAO")
         if exige_absoluta:
+            # Membros da Câmara = mandatos da legislatura dos votantes (a
+            # mais recente do primeiro votante), para não somar mandatos de
+            # legislaturas diferentes. Sem mandato conhecido, conta todos.
+            primeiro = next(iter(votos))
             (membros,) = banco.execute(
-                "SELECT COUNT(*) FROM mandato"
+                """SELECT COUNT(*) FROM mandato WHERE legislatura_id =
+                     (SELECT legislatura_id FROM mandato
+                       WHERE parlamentar_id = ?
+                       ORDER BY legislatura_id DESC LIMIT 1)""",
+                (primeiro,),
             ).fetchone()
+            if not membros:
+                (membros,) = banco.execute(
+                    "SELECT COUNT(*) FROM mandato").fetchone()
             resultado = "APROVADA" if sim > membros / 2 else "REJEITADA"
         else:
             resultado = "APROVADA" if sim > nao else "REJEITADA"

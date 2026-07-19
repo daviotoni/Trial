@@ -290,6 +290,26 @@ def gerar() -> str:
     ) + ";")
     out("")
 
+    # 20ª Legislatura (2025-2028) com os 29 vereadores e seus mandatos,
+    # cada um vinculado ao respectivo gabinete. Com isso, o login do
+    # gabinete identifica o vereador titular — autor automático das
+    # proposições que o gabinete protocola.
+    out("INSERT INTO legislatura (id, numero, inicio, fim) VALUES")
+    out("  (1, 20, '2025-01-01', '2028-12-31');")
+    out("")
+    out("INSERT INTO parlamentar (id, nome) VALUES")
+    out(",\n".join(
+        f"  ({i}, {_sql(nome)})"
+        for i, nome in enumerate(VEREADORES_20A_LEGISLATURA, start=1)
+    ) + ";")
+    out("")
+    out("INSERT INTO mandato (parlamentar_id, legislatura_id, "
+        "gabinete_unidade_id) VALUES")
+    out(",\n".join(
+        f"  ({i}, 1, {gid})" for i, gid in enumerate(gab_ids, start=1)
+    ) + ";")
+    out("")
+
     # Tipos de processo e seus ritos (fluxo por etapas). Configuráveis:
     # o caminho é dado, não fixo no código. Cada etapa é a passagem por uma
     # unidade real da Lei 3.525/2025, com a ação e o prazo (SLA) sugerido.
@@ -298,22 +318,51 @@ def gerar() -> str:
             raise ValueError(f"unidade inexistente no fluxo: {nome!r}")
         return unidade_db_por_nome[nome]
 
+    # Rito dos projetos (matéria de mérito: PL, PLC, PELO, PDL, PR).
+    ETAPAS_PROJETO = [
+        ("Gabinetes de Vereadores", "Autoria e apresentação da proposição", 0),
+        ("Coordenadoria da Secretaria-Geral",
+         "Protocolo, autuação e numeração", 2),
+        ("Consultoria-Geral Legislativa",
+         "Análise de constitucionalidade e técnica legislativa", 10),
+        ("Assistência às Comissões Permanentes",
+         "Distribuição às comissões e coleta de pareceres", 15),
+        ("Diretoria de Plenário",
+         "Inclusão em Ordem do Dia e deliberação", 5),
+        ("Coordenadoria de Redação Oficial e Legislativa",
+         "Redação final do autógrafo", 3),
+        ("Presidência", "Promulgação ou encaminhamento à sanção", 5),
+    ]
+    # Rito de expediente sujeito a despacho do Presidente (indicações,
+    # arts. 101-104; requerimentos dos arts. 108-110).
+    ETAPAS_EXPEDIENTE = [
+        ("Gabinetes de Vereadores", "Autoria e apresentação", 0),
+        ("Coordenadoria da Secretaria-Geral", "Protocolo e autuação", 2),
+        ("Presidência",
+         "Despacho: encaminhamento ao Executivo ou à comissão", 5),
+    ]
+    # Rito das moções (deliberação em Plenário, arts. 105-106).
+    ETAPAS_MOCAO = [
+        ("Gabinetes de Vereadores", "Autoria e apresentação", 0),
+        ("Coordenadoria da Secretaria-Geral", "Protocolo e autuação", 2),
+        ("Diretoria de Plenário", "Inclusão em pauta e deliberação", 5),
+    ]
+
     # (codigo, nome, dominio, [(unidade, acao, prazo_dias), ...])
     fluxos = [
-        ("PL", "Projeto de Lei", "LEGISLATIVO", [
-            ("Gabinetes de Vereadores", "Autoria e apresentação da proposição", 0),
-            ("Coordenadoria da Secretaria-Geral",
-             "Protocolo, autuação e numeração", 2),
-            ("Consultoria-Geral Legislativa",
-             "Análise de constitucionalidade e técnica legislativa", 10),
-            ("Assistência às Comissões Permanentes",
-             "Distribuição às comissões e coleta de pareceres", 15),
-            ("Diretoria de Plenário",
-             "Inclusão em Ordem do Dia e deliberação", 5),
-            ("Coordenadoria de Redação Oficial e Legislativa",
-             "Redação final do autógrafo", 3),
-            ("Presidência", "Promulgação ou encaminhamento à sanção", 5),
-        ]),
+        ("PL", "Projeto de Lei", "LEGISLATIVO", ETAPAS_PROJETO),
+        ("PLC", "Projeto de Lei Complementar à Lei Orgânica",
+         "LEGISLATIVO", ETAPAS_PROJETO),
+        ("PELO", "Proposta de Emenda à Lei Orgânica",
+         "LEGISLATIVO", ETAPAS_PROJETO),
+        ("PDL", "Projeto de Decreto Legislativo",
+         "LEGISLATIVO", ETAPAS_PROJETO),
+        ("PR", "Projeto de Resolução", "LEGISLATIVO", ETAPAS_PROJETO),
+        ("INDICACAO", "Indicação (arts. 101-104)",
+         "LEGISLATIVO", ETAPAS_EXPEDIENTE),
+        ("REQUERIMENTO", "Requerimento (arts. 107-113)",
+         "LEGISLATIVO", ETAPAS_EXPEDIENTE),
+        ("MOCAO", "Moção (arts. 105-106)", "LEGISLATIVO", ETAPAS_MOCAO),
         ("COMPRA", "Contratação (Lei 14.133/2021)", "ADMINISTRATIVO", [
             ("Coordenadoria da Secretaria-Geral",
              "Protocolo e autuação do pedido", 2),

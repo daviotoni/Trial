@@ -209,15 +209,31 @@ CREATE TABLE mandato (
     UNIQUE (parlamentar_id, legislatura_id)
 );
 
+-- Proposições (art. 87, §1º do Regimento Interno). O gabinete trabalha em
+-- RASCUNHO (sem número, visível só ao setor autor); a numeração sequencial
+-- nasce no protocolo. Campos do Regimento: texto articulado (art. 92),
+-- justificativa obrigatória no protocolo (art. 88, §4º) e regime de
+-- tramitação (art. 91).
 CREATE TABLE proposicao (
     id                  INTEGER PRIMARY KEY,
     tipo                TEXT NOT NULL CHECK (tipo IN
-                          ('PL', 'PLC', 'PDL', 'PR', 'EMENDA', 'INDICACAO',
-                           'REQUERIMENTO', 'MOCAO', 'VETO')),
-    numero              INTEGER NOT NULL,
-    ano                 INTEGER NOT NULL,
+                          ('PELO', 'PL', 'PLC', 'PDL', 'PR', 'EMENDA',
+                           'INDICACAO', 'REQUERIMENTO', 'MOCAO', 'VETO')),
+    -- Subtipo regimental: INDICACAO (SIMPLES/LEGISLATIVA, arts. 101-104),
+    -- MOCAO (APLAUSO/PESAR/REPUDIO/CONGRATULACOES/DESAPROVACAO, arts.
+    -- 105-106), REQUERIMENTO (DESPACHO_PRESIDENTE/DELIBERACAO_PLENARIO,
+    -- art. 107). NULL para projetos.
+    subtipo             TEXT,
+    -- NULL enquanto rascunho; numerada no protocolo.
+    numero              INTEGER,
+    ano                 INTEGER,
     ementa              TEXT NOT NULL,
+    texto               TEXT,              -- texto articulado (art. 92)
+    justificativa       TEXT,              -- art. 88, §4º
+    regime              TEXT NOT NULL DEFAULT 'ORDINARIA' CHECK (regime IN
+                          ('ORDINARIA', 'PRIORIDADE', 'ESPECIAL', 'URGENCIA')),
     autor_parlamentar_id INTEGER REFERENCES parlamentar (id),  -- NULL: Executivo/Mesa
+    unidade_autora_id   INTEGER REFERENCES unidade (id),  -- gabinete/setor autor
     processo_id         INTEGER REFERENCES processo (id),
     situacao            TEXT NOT NULL DEFAULT 'EM_TRAMITACAO',
     UNIQUE (tipo, numero, ano)

@@ -403,6 +403,63 @@ class Aplicacao:
             for pid, numero, ano, assunto, situacao, loc, prop in linhas
         ]
 
+    # ------------------ gabinete: rascunhos ------------------------
+
+    def tipos_proposicao(self):
+        """Catálogo regimental das proposições (art. 87, §1º)."""
+        return [
+            {"codigo": codigo, "nome": meta["nome"],
+             "exige_texto": meta["exige_texto"],
+             "subtipos": meta["subtipos"], "base": meta["base"]}
+            for codigo, meta in legislativo.CATALOGO_PROPOSICOES.items()
+        ]
+
+    def _unidade_do_usuario(self):
+        uid = self.usuario_atual.get("unidade_id")
+        if not uid:
+            raise RegraViolada("operação exige login lotado num setor")
+        return uid
+
+    def listar_rascunhos(self):
+        return legislativo.rascunhos_do_setor(
+            self.banco, self._unidade_do_usuario())
+
+    def criar_rascunho(self, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
+        rid = legislativo.criar_rascunho(
+            self.banco, self._unidade_do_usuario(), dados["tipo"],
+            dados.get("ementa", ""), dados.get("subtipo"),
+            dados.get("texto"), dados.get("justificativa"),
+            dados.get("regime", "ORDINARIA"))
+        self.banco.commit()
+        return {"id": rid}
+
+    def atualizar_rascunho(self, rascunho_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
+        legislativo.atualizar_rascunho(
+            self.banco, rascunho_id, self._unidade_do_usuario(), **dados)
+        self.banco.commit()
+        return {"id": rascunho_id}
+
+    def excluir_rascunho(self, rascunho_id: int):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
+        legislativo.excluir_rascunho(
+            self.banco, rascunho_id, self._unidade_do_usuario())
+        self.banco.commit()
+        return {"id": rascunho_id, "excluido": True}
+
+    def protocolar_rascunho(self, rascunho_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
+        _, rotulo = legislativo.protocolar_rascunho(
+            self.banco, rascunho_id, self._unidade_do_usuario(),
+            dados["data"])
+        self.banco.commit()
+        return {"id": rascunho_id, "rotulo": rotulo}
+
     def apresentar_do_setor(self, dados):
         """O setor (ex.: gabinete) apresenta uma proposição de autoria própria.
 
@@ -634,6 +691,17 @@ ROTAS = [
      lambda app, m, d: app.minhas_proposicoes()),
     ("POST", r"^/minhas-proposicoes$", "LEGISLATIVO",
      lambda app, m, d: app.apresentar_do_setor(d)),
+    ("GET", r"^/tipos-proposicao$", None,
+     lambda app, m, d: app.tipos_proposicao()),
+    ("GET", r"^/rascunhos$", "*", lambda app, m, d: app.listar_rascunhos()),
+    ("POST", r"^/rascunhos$", "LEGISLATIVO",
+     lambda app, m, d: app.criar_rascunho(d)),
+    ("POST", r"^/rascunhos/(\d+)$", "LEGISLATIVO",
+     lambda app, m, d: app.atualizar_rascunho(int(m.group(1)), d)),
+    ("POST", r"^/rascunhos/(\d+)/exclusao$", "LEGISLATIVO",
+     lambda app, m, d: app.excluir_rascunho(int(m.group(1)))),
+    ("POST", r"^/rascunhos/(\d+)/protocolo$", "LEGISLATIVO",
+     lambda app, m, d: app.protocolar_rascunho(int(m.group(1)), d)),
     ("GET", r"^/organograma$", None, lambda app, m, d: app.organograma()),
     ("GET", r"^/unidades$", None, lambda app, m, d: app.unidades()),
     ("GET", r"^/cargos$", None, lambda app, m, d: app.cargos()),
