@@ -18,7 +18,12 @@ class TestBancoSistema(unittest.TestCase):
         return self.banco.execute(sql).fetchone()[0]
 
     def test_unidades_carregadas(self):
-        self.assertEqual(self._um("SELECT COUNT(*) FROM unidade"), 49)
+        # 49 unidades da estrutura da Lei 3.525 + 29 gabinetes (roster).
+        self.assertEqual(self._um("SELECT COUNT(*) FROM unidade"), 78)
+        self.assertEqual(
+            self._um("SELECT COUNT(*) FROM unidade "
+                     "WHERE nome LIKE 'Gabinete do(a)%'"), 29
+        )
         self.assertEqual(
             self._um("SELECT COUNT(*) FROM unidade WHERE grau = 2"), 20
         )

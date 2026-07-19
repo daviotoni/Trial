@@ -260,6 +260,55 @@ class TestAPI(unittest.TestCase):
             f"/unidades/{etapas[0]['unidade_id']}/competencias")
         self.assertEqual(codigo, 200)
 
+    def test_acesso_por_unidade_e_posse(self):
+        _, unidades = requisitar(self.base, "GET", "/unidades")
+        gabs = [u for u in unidades if u["nome"].startswith("Gabinete do(a)")]
+        gab_a, gab_b = gabs[0], gabs[1]
+        secretaria = next(u for u in unidades
+                          if u["nome"] == "Coordenadoria da Secretaria-Geral")
+
+        # Dois usuários de gabinete (ambos com área LEGISLATIVO).
+        for login, uid in (("gab.a", gab_a["id"]), ("gab.b", gab_b["id"])):
+            requisitar(self.base, "POST", "/usuarios", {
+                "login": login, "senha": "senha123", "perfil": "LEGISLATIVO",
+                "unidade_id": uid})
+        _, sa = requisitar(self.base, "POST", "/login",
+                           {"login": "gab.a", "senha": "senha123"}, token=False)
+        _, sb = requisitar(self.base, "POST", "/login",
+                           {"login": "gab.b", "senha": "senha123"}, token=False)
+
+        # /me revela unidade e áreas.
+        codigo, eu = requisitar(self.base, "GET", "/me", token=sa["token"])
+        self.assertEqual(codigo, 200)
+        self.assertEqual(eu["areas"], ["LEGISLATIVO"])
+        self.assertTrue(eu["unidade"].startswith("Gabinete do(a)"))
+
+        # Gabinete NÃO tem alçada de PROTOCOLO → 403 ao autuar.
+        codigo, _ = requisitar(self.base, "POST", "/processos", {
+            "tipo": "LEGISLATIVO", "assunto": "PL do gabinete",
+            "unidade_origem_id": gab_a["id"], "data_autuacao": "2025-09-10"},
+            token=sa["token"])
+        self.assertEqual(codigo, 403)
+
+        # Admin autua um processo com origem no gabinete A.
+        _, proc = requisitar(self.base, "POST", "/processos", {
+            "tipo": "LEGISLATIVO", "assunto": "Posse teste",
+            "unidade_origem_id": gab_a["id"], "data_autuacao": "2025-09-10"})
+
+        # Gabinete B (mesma área, mas não detém) → 403 por POSSE.
+        codigo, _ = requisitar(
+            self.base, "POST", f"/processos/{proc['id']}/tramitacoes",
+            {"unidade_destino_id": secretaria["id"], "data_envio": "2025-09-11"},
+            token=sb["token"])
+        self.assertEqual(codigo, 403)
+
+        # Gabinete A (detém) → encaminha com sucesso.
+        codigo, _ = requisitar(
+            self.base, "POST", f"/processos/{proc['id']}/tramitacoes",
+            {"unidade_destino_id": secretaria["id"], "data_envio": "2025-09-11"},
+            token=sa["token"])
+        self.assertEqual(codigo, 200)
+
     def test_escrita_sem_login_retorna_401(self):
         codigo, erro = requisitar(self.base, "POST", "/processos", {
             "tipo": "ADMINISTRATIVO", "assunto": "X",

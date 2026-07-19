@@ -106,7 +106,7 @@ class TestTransparencia(unittest.TestCase):
 
     def test_painel(self):
         numeros = transparencia.painel(self.banco)
-        self.assertEqual(numeros["unidades"], 49)
+        self.assertEqual(numeros["unidades"], 78)  # 49 estrutura + 29 gabinetes
         self.assertEqual(numeros["vagas_anexo_i"], 615)
         self.assertEqual(numeros["contratos"], 0)
 

@@ -384,7 +384,24 @@ CREATE TABLE usuario (
                   ('ADMIN', 'RH', 'PROTOCOLO', 'LEGISLATIVO',
                    'COMPRAS', 'CONTROLE')),
     servidor_id INTEGER REFERENCES servidor (id),
+    -- Lotação do usuário: o setor (unidade) em que ele trabalha. Quando
+    -- preenchida, o acesso vem das áreas mapeadas para essa unidade
+    -- (unidade_area), tornando o controle por setor real. NULL = usa o
+    -- perfil como alçada (compatibilidade). ADMIN é sempre superusuário.
+    unidade_id  INTEGER REFERENCES unidade (id),
     ativo       INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0, 1))
+);
+
+-- Áreas funcionais que cada unidade (setor) opera. É o que dá sentido a
+-- "cada setor só acessa o que lhe cabe": o usuário lotado na unidade
+-- herda essas áreas. Ex.: Secretaria-Geral → PROTOCOLO; CPL → COMPRAS;
+-- gabinetes → LEGISLATIVO; RH → PESSOAL/FOLHA.
+CREATE TABLE unidade_area (
+    unidade_id INTEGER NOT NULL REFERENCES unidade (id),
+    area       TEXT NOT NULL CHECK (area IN
+                 ('PESSOAL', 'FOLHA', 'PROTOCOLO', 'LEGISLATIVO',
+                  'COMPRAS', 'TRANSPARENCIA', 'CONTROLE', 'USUARIOS')),
+    PRIMARY KEY (unidade_id, area)
 );
 
 -- ============================================================

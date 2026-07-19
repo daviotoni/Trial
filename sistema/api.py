@@ -91,11 +91,26 @@ class Aplicacao:
         try:
             uid = autenticacao.criar_usuario(
                 self.banco, dados["login"], dados["senha"], dados["perfil"],
-                dados.get("servidor_id"))
+                dados.get("servidor_id"), dados.get("unidade_id"))
         except ValueError as erro:
             raise RegraViolada(str(erro))
         self.banco.commit()
         return {"id": uid}
+
+    def eu(self):
+        """Identidade e alçada do usuário logado (para a interface)."""
+        u = self.usuario_atual
+        unidade = None
+        if u.get("unidade_id"):
+            linha = self.banco.execute(
+                "SELECT nome FROM unidade WHERE id = ?", (u["unidade_id"],)
+            ).fetchone()
+            unidade = linha[0] if linha else None
+        return {
+            "login": u["login"], "perfil": u["perfil"],
+            "unidade_id": u.get("unidade_id"), "unidade": unidade,
+            "areas": sorted(autenticacao.areas_do_usuario(self.banco, u)),
+        }
 
     # -------------------------- consultas --------------------------
 
@@ -266,6 +281,7 @@ class Aplicacao:
         return {"id": pid, "numero": numero}
 
     def tramitar(self, processo_id: int, dados):
+        autenticacao.exigir_posse(self.banco, self.usuario_atual, processo_id)
         tid = servicos.tramitar(
             self.banco, processo_id, dados["unidade_destino_id"],
             dados.get("despacho", ""), dados["data_envio"],
@@ -303,6 +319,7 @@ class Aplicacao:
         return prox if prox is not None else {"proxima_etapa": None}
 
     def tramitar_pelo_fluxo(self, processo_id: int, dados):
+        autenticacao.exigir_posse(self.banco, self.usuario_atual, processo_id)
         etapa = fluxo.tramitar_pelo_fluxo(
             self.banco, processo_id, dados["data_envio"],
             dados.get("despacho", ""))
@@ -310,6 +327,11 @@ class Aplicacao:
         return etapa
 
     def receber_tramitacao(self, tramitacao_id: int, dados):
+        linha = self.banco.execute(
+            "SELECT processo_id FROM tramitacao WHERE id = ?", (tramitacao_id,)
+        ).fetchone()
+        if linha:
+            autenticacao.exigir_posse(self.banco, self.usuario_atual, linha[0])
         servicos.receber_tramitacao(self.banco, tramitacao_id,
                                     dados["data_recebimento"])
         self.banco.commit()
@@ -497,6 +519,7 @@ class Aplicacao:
 ROTAS = [
     ("POST", r"^/login$", None, lambda app, m, d: app.login(d)),
     ("POST", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.criar_usuario(d)),
+    ("GET", r"^/me$", "*", lambda app, m, d: app.eu()),
     ("GET", r"^/organograma$", None, lambda app, m, d: app.organograma()),
     ("GET", r"^/unidades$", None, lambda app, m, d: app.unidades()),
     ("GET", r"^/cargos$", None, lambda app, m, d: app.cargos()),
@@ -510,9 +533,11 @@ ROTAS = [
      lambda app, m, d: app.listar_processos(app.query_atual)),
     ("GET", r"^/processos/(\d+)$", None,
      lambda app, m, d: app.processo(int(m.group(1)))),
-    ("POST", r"^/processos/(\d+)/tramitacoes$", "PROTOCOLO",
+    # Encaminhar/receber é liberado pela POSSE (quem detém o processo),
+    # não por área — cada setor remete o que está com ele ao seguinte.
+    ("POST", r"^/processos/(\d+)/tramitacoes$", "*",
      lambda app, m, d: app.tramitar(int(m.group(1)), d)),
-    ("POST", r"^/tramitacoes/(\d+)/recebimento$", "PROTOCOLO",
+    ("POST", r"^/tramitacoes/(\d+)/recebimento$", "*",
      lambda app, m, d: app.receber_tramitacao(int(m.group(1)), d)),
     ("GET", r"^/processos/atrasados$", "PROTOCOLO",
      lambda app, m, d: app.processos_em_atraso(d)),
@@ -526,7 +551,7 @@ ROTAS = [
      lambda app, m, d: app.vincular_tipo(int(m.group(1)), d)),
     ("GET", r"^/processos/(\d+)/proxima-etapa$", None,
      lambda app, m, d: app.proxima_etapa(int(m.group(1)))),
-    ("POST", r"^/processos/(\d+)/tramitar-fluxo$", "PROTOCOLO",
+    ("POST", r"^/processos/(\d+)/tramitar-fluxo$", "*",
      lambda app, m, d: app.tramitar_pelo_fluxo(int(m.group(1)), d)),
     ("POST", r"^/processos/(\d+)/(arquivamento|conclusao|desarquivamento)$",
      "PROTOCOLO",
@@ -609,8 +634,11 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:"):
                     try:
                         with aplicacao.trava:
                             usuario = aplicacao.sessoes.usuario(token)
-                            if area is not None:
-                                autenticacao.exigir(usuario, area)
+                            if area == "*":
+                                if usuario is None:
+                                    raise NaoAutenticado("operação exige login")
+                            elif area is not None:
+                                autenticacao.exigir(aplicacao.banco, usuario, area)
                             aplicacao.usuario_atual = usuario
                             aplicacao.query_atual = parse_qs(url.query)
                             return self._responder(200, acao(aplicacao, m, corpo))

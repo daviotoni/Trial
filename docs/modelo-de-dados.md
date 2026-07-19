@@ -148,6 +148,19 @@ navegado etapa a etapa: `proxima_etapa` diz para onde seguir e
 configurável**, não código: cria-se tipo e etapas sem alterar o programa.
 Vêm semeados dois ritos reais (PL e COMPRA da Lei 14.133/2021).
 
+### 8b. Acesso por unidade (`usuario.unidade_id`, `unidade_area`)
+
+O controle de acesso é **por setor real**: `usuario.unidade_id` lota o
+usuário numa unidade, e `unidade_area` diz quais áreas funcionais aquele
+setor opera. O usuário herda essas áreas — é o que dá sentido a "cada setor
+só acessa o que lhe cabe". Um `perfil` legado permanece como
+compatibilidade quando não há lotação; o `ADMIN` é superusuário. Além da
+alçada por área, a movimentação de processos é limitada por **posse**: só a
+unidade que detém o processo o encaminha ao setor seguinte. O quadro
+operacional inclui os **29 gabinetes** de vereador (20ª Legislatura) como
+unidades com acesso legislativo próprio — dado de roster, separado da
+estrutura da lei em `orgao/cmdc.py`.
+
 ## Decisões de projeto
 
 1. **SQL portável**: sem tipos proprietários; roda hoje em SQLite (estudo,

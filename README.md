@@ -100,16 +100,25 @@ python -m sistema.api       # API REST em http://127.0.0.1:8000 (banco cmdc.db)
 python -m sistema.gerar_seed > sistema/seed.sql   # regenera a carga inicial
 ```
 
-**Autenticação e alçadas por setor**: `POST /login` devolve um token
-(`Authorization: Bearer`); cada perfil opera só a sua área — `RH`
-(pessoal/folha), `PROTOCOLO`, `LEGISLATIVO`, `COMPRAS`, `CONTROLE`
-(auditoria/transparência/folha) e `ADMIN` (tudo, cria usuários via
-`POST /usuarios`). Senhas com PBKDF2; primeiro acesso: usuário `admin`
-com a senha inicial documentada em `sistema/autenticacao.py` (troque-a).
-Consultas de transparência ativa (organograma, cargos, painel, placar,
-pendências) permanecem públicas, por princípio da LAI. Sem login → 401;
-sem alçada → 403 (ex.: perfil PROTOCOLO tentando cadastrar fornecedor).
-A trilha de auditoria registra o login de quem fez cada operação.
+**Acesso por unidade (setor)**: `POST /login` devolve um token
+(`Authorization: Bearer`). O usuário é **lotado numa unidade real** da Lei
+3.525/2025 e herda as áreas que aquele setor opera (`unidade_area`) — ex.:
+Secretaria-Geral → `PROTOCOLO`, CPL → `COMPRAS`, Recursos Humanos →
+`PESSOAL/FOLHA`, e cada um dos **29 gabinetes de vereador** → `LEGISLATIVO`.
+`GET /me` devolve a unidade e as áreas do usuário logado (base da
+interface por setor). O `ADMIN` (Diretoria-Geral/TI) é superusuário e cria
+usuários via `POST /usuarios` (campo `unidade_id`). Um `perfil` legado
+serve de compatibilidade quando não há lotação. Senhas com PBKDF2;
+primeiro acesso: usuário `admin` com a senha inicial documentada em
+`sistema/autenticacao.py` (troque-a). Consultas de transparência ativa
+permanecem públicas, por princípio da LAI. Sem login → 401; sem alçada →
+403. Demonstração: `python -m sistema.autenticacao`.
+
+**Posse do processo**: encaminhar ou receber um processo é liberado por
+**posse — só o setor que detém o processo o remete ao seguinte** (não por
+área). Um gabinete não movimenta o processo de outro; o Protocolo autua,
+mas cada setor conduz o que está com ele. A trilha de auditoria registra o
+login de quem fez cada operação.
 
 A API (`sistema/api.py`, biblioteca padrão, sem dependências) expõe
 organograma, unidades, cargos com vagas disponíveis, servidores, nomeações,

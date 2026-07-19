@@ -24,6 +24,41 @@ from orgao.cmdc import (
 
 VIGENCIA = "2025-09-01"  # efeitos financeiros da Lei 3.525/2025 (art. 102)
 
+# Vereadores da 20ª Legislatura (nome parlamentar) — fonte: portal da CMDC.
+# Cada um tem um gabinete próprio, que é um setor com acesso legislativo.
+VEREADORES_20A_LEGISLATURA = [
+    "Chiquinho Caipira", "Alex Freitas", "Andréia Zito", "Junior Uios",
+    "Carlinhos da Barreira", "Claudio Thomaz", "Clovinho Sempre Junto",
+    "Delza de Oliveira", "Junior Reis", "Anderson Lopes", "Eduardo Moreira",
+    "Fernanda Costa", "Giorgio Monteiro", "Juliana do Taxi",
+    "Leandro Enfermeiro", "Catiti", "Marquinho Oi", "Marquinho Dentista",
+    "Marquinho da Pipa", "Dr. Maurício", "Michel Reis", "Michele Tavares",
+    "Moises Neguinho", "Beto Gabriel", "Saulo Henrique", "Serginho Corrêa",
+    "Valdecy Nunes", "Vitinho Grandão", "Wendell Oliveira",
+]
+
+# Áreas funcionais operadas por cada setor (unidade → áreas). Base do
+# controle de acesso por unidade: quem trabalha ali herda estas áreas.
+UNIDADE_AREAS = {
+    "Coordenadoria da Secretaria-Geral": ["PROTOCOLO"],
+    "Coordenadoria de Recursos Humanos": ["PESSOAL", "FOLHA"],
+    "Departamento do e-Social": ["FOLHA"],
+    "Coordenadoria de Contabilidade": ["FOLHA"],
+    "Coordenadoria de Finanças": ["FOLHA"],
+    "Comissão Permanente de Licitação": ["COMPRAS"],
+    "Coordenadoria de Licitações e Contratos": ["COMPRAS"],
+    "Coordenadoria de Material": ["COMPRAS"],
+    "Coordenadoria de Avaliação e Acompanhamento de Compras": ["COMPRAS"],
+    "Controladoria-Geral": ["CONTROLE", "FOLHA"],
+    "Coordenadoria de Publicações e Transparência": ["TRANSPARENCIA", "CONTROLE"],
+    "Diretoria de Plenário": ["LEGISLATIVO"],
+    "Coordenadoria de Apoio Legislativo": ["LEGISLATIVO"],
+    "Coordenadoria de Assuntos de Plenário": ["LEGISLATIVO"],
+    "Coordenadoria de Atas e Projetos": ["LEGISLATIVO"],
+    "Assistência às Comissões Permanentes": ["LEGISLATIVO"],
+    "Coordenadoria de Tecnologia da Informação e Comunicação": ["USUARIOS"],
+}
+
 RUBRICAS = [
     ("VENC", "Vencimento/retribuição básica", "VENCIMENTO",
      "Lei 3.525/2025, art. 6º", None, 1),
@@ -94,11 +129,14 @@ def gerar() -> str:
     cmdc = construir_cmdc()
     ids: dict[int, int] = {}  # id(objeto unidade) -> id no banco
     valores = []
+    gab_parent_id = None
     pilha = [(cmdc.unidade_topo, None)]
     proximo = 1
     while pilha:
         unidade, pai_db = pilha.pop(0)
         ids[id(unidade)] = proximo
+        if unidade.nome == "Gabinetes de Vereadores":
+            gab_parent_id = proximo
         tipo, grau = _tipo_unidade(unidade.nome)
         valores.append(
             f"  ({proximo}, {_sql(unidade.nome)}, {_sql(unidade.sigla or None)}, "
@@ -107,6 +145,20 @@ def gerar() -> str:
         for sub in unidade.subunidades:
             pilha.append((sub, proximo))
         proximo += 1
+
+    # Roster operacional: um gabinete (setor com acesso próprio) para cada
+    # vereador da 20ª Legislatura. A estrutura da lei (cmdc.py) fica intacta;
+    # este é o quadro de ocupação, que muda a cada legislatura.
+    gab_ids: list[int] = []
+    for apelido in VEREADORES_20A_LEGISLATURA:
+        nome = f"Gabinete do(a) Vereador(a) {apelido}"
+        valores.append(
+            f"  ({proximo}, {_sql(nome)}, {_sql('GAB')}, 3, "
+            f"{_sql('ASSESSORAMENTO')}, {_sql(gab_parent_id)}, 1, {_sql(VIGENCIA)})"
+        )
+        gab_ids.append(proximo)
+        proximo += 1
+
     out("INSERT INTO unidade (id, nome, sigla, grau, tipo, unidade_pai_id, "
         "norma_id, vigente_desde) VALUES")
     out(",\n".join(valores) + ";")
@@ -241,6 +293,18 @@ def gerar() -> str:
     out("INSERT INTO fluxo_etapa (tipo_processo_id, ordem, unidade_id, "
         "acao, prazo_dias, obrigatoria) VALUES")
     out(",\n".join(etapa_rows) + ";")
+    out("")
+
+    # Áreas por unidade (controle de acesso por setor). Setores mapeados +
+    # os 29 gabinetes, que operam a área LEGISLATIVO.
+    area_rows = []
+    for nome, areas in UNIDADE_AREAS.items():
+        for area in areas:
+            area_rows.append(f"  ({_uid(nome)}, {_sql(area)})")
+    for gid in gab_ids:
+        area_rows.append(f"  ({gid}, {_sql('LEGISLATIVO')})")
+    out("INSERT INTO unidade_area (unidade_id, area) VALUES")
+    out(",\n".join(area_rows) + ";")
     out("")
     return "\n".join(linhas)
 
