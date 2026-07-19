@@ -310,7 +310,17 @@ const consultar = async (caminho, opcoes = {}) => {
     {}, opcoes.headers, token ? {"Authorization": `Bearer ${token}`} : {});
   const resposta = await fetch(caminho, opcoes);
   const corpo = await resposta.json();
-  if (!resposta.ok) throw new Error(corpo.erro || resposta.status);
+  if (!resposta.ok) {
+    // Token velho (ex.: servidor reiniciou) → desloga e pede novo login.
+    if (resposta.status === 401 && localStorage.getItem("token")) {
+      localStorage.clear();
+      if (typeof mostrarStatusLogin === "function") mostrarStatusLogin();
+      if (typeof aplicarPermissoes === "function") aplicarPermissoes();
+      const st = document.getElementById("login-status");
+      if (st) st.textContent = "Sessão expirada — entre novamente";
+    }
+    throw new Error(corpo.erro || resposta.status);
+  }
   return corpo;
 };
 const enviar = (caminho, dados) => consultar(caminho, {
