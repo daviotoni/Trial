@@ -38,6 +38,11 @@ erDiagram
     proposicao ||--o{ votacao : objeto
     votacao ||--o{ voto : registra
     parlamentar ||--o{ voto : vota
+    proposicao ||--o{ relatoria : distribuida
+    comissao_permanente ||--o{ relatoria : instrui
+    parlamentar ||--o{ relatoria : relata
+    relatoria ||--o{ parecer : conclui
+    proposicao ||--o{ parecer : opina
     processo |o--o{ contratacao : instrui
     contratacao ||--o{ contrato : gera
     fornecedor ||--o{ contrato : contratado
@@ -101,6 +106,22 @@ Proposições (PL, PDL, PR, emendas, indicações…) vinculadas ao processo
 autuado, pautadas em sessões, votadas de forma simbólica ou **nominal** (voto
 individual por parlamentar). Compatível com os fluxos do SAPL/Interlegis,
 permitindo integração futura.
+
+### 5b. Comissões, relatoria e pareceres (`comissao_permanente`, `relatoria`, `parecer`)
+
+Instrução da matéria nas comissões permanentes temáticas antes da
+deliberação em Plenário (art. 33 e segs. do Regimento Interno). A
+`relatoria` designa um relator (parlamentar) para a proposição numa
+comissão, com prazo regimental; o `parecer` (favorável, com emendas,
+contrário ou pela rejeição) é emitido e aprovado pelo colegiado. Regra de
+negócio: matéria de mérito (PL, PLC, PDL, PR) só entra em Ordem do Dia com
+parecer aprovado, **salvo regime de urgência**, e o parecer **não vincula**
+o Plenário. Não confundir com as comissões *administrativas* do art. 45 da
+Lei 3.525/2025 (essas ficam em `designacao_comissao`, módulo de folha).
+
+O módulo de tramitação (§4) ganhou um campo **`prazo` (SLA)** por passagem:
+`processos_em_atraso` lista processos cuja última tramitação segue sem
+recebimento com prazo vencido.
 
 ### 6. Compras, contratos e execução (`fornecedor`, `contratacao`, `contrato`, `empenho`)
 

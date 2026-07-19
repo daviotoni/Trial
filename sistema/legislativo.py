@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from sistema import comissoes
 from sistema.servicos import RegraViolada, autuar_processo
 
 # Comissões permanentes temáticas do art. 33 do Regimento Interno
@@ -139,8 +140,27 @@ def convocar_sessao(banco: sqlite3.Connection, tipo: str, data: str) -> tuple[in
     return sessao_id, numero
 
 
-def pautar(banco: sqlite3.Connection, sessao_id: int, proposicao_id: int) -> int:
-    """Inclui a proposição no fim da ordem do dia da sessão."""
+def pautar(banco: sqlite3.Connection, sessao_id: int, proposicao_id: int,
+           urgencia: bool = False) -> int:
+    """Inclui a proposição no fim da ordem do dia da sessão.
+
+    Matéria de mérito (PL, PLC, PDL, PR) só entra em Ordem do Dia com
+    **parecer aprovado** de comissão (art. 33 e segs. do Regimento
+    Interno). O regime de `urgencia=True` dispensa o parecer prévio
+    (pareceres podem ser proferidos oralmente em Plenário).
+    """
+    linha = banco.execute(
+        "SELECT tipo FROM proposicao WHERE id = ?", (proposicao_id,)
+    ).fetchone()
+    if linha is None:
+        raise RegraViolada("proposição inexistente")
+    tipo_proposicao = linha[0]
+    if not urgencia and comissoes.exige_parecer(tipo_proposicao) \
+            and not comissoes.tem_parecer_aprovado(banco, proposicao_id):
+        raise RegraViolada(
+            f"{tipo_proposicao} só entra em pauta com parecer de comissão "
+            "aprovado (ou em regime de urgência)")
+
     (ordem,) = banco.execute(
         "SELECT COALESCE(MAX(ordem), 0) + 1 FROM pauta_item WHERE sessao_id = ?",
         (sessao_id,),
@@ -284,6 +304,16 @@ def main() -> None:
         "2025-09-10", autor_parlamentar_id=ids[0],
         unidade_protocolo_id=protocolo,
     )
+
+    # Instrução em comissão antes da Ordem do Dia (art. 33 do Regimento).
+    relatoria = comissoes.distribuir_relatoria(
+        banco, proposicao, "Comissão de Educação e Cultura", ids[1],
+        "2025-09-11", prazo="2025-09-25")
+    parecer = comissoes.emitir_parecer(
+        banco, relatoria, "FAVORAVEL",
+        "Parecer favorável à proposição.", "2025-09-15")
+    comissoes.aprovar_parecer(banco, parecer)
+
     sessao, numero = convocar_sessao(banco, "ORDINARIA", "2025-09-16")
     pautar(banco, sessao, proposicao)
 

@@ -226,8 +226,13 @@ def tramitar(
     unidade_destino_id: int,
     despacho: str,
     data_envio: str,
+    prazo: str | None = None,
 ) -> int:
-    """Tramita a partir da unidade onde o processo está (origem ou último destino)."""
+    """Tramita a partir da unidade onde o processo está (origem ou último destino).
+
+    `prazo` (opcional, ISO-8601) fixa o SLA para a unidade destino receber
+    ou se manifestar; alimenta a consulta `processos_em_atraso`.
+    """
     situacao = banco.execute(
         "SELECT situacao FROM processo WHERE id = ?", (processo_id,)
     ).fetchone()
@@ -235,6 +240,8 @@ def tramitar(
         raise RegraViolada("processo inexistente")
     if situacao[0] in ("ARQUIVADO", "CONCLUIDO"):
         raise RegraViolada(f"processo {situacao[0].lower()} não tramita")
+    if prazo is not None and prazo < data_envio:
+        raise RegraViolada("prazo não pode ser anterior à data de envio")
 
     atual = banco.execute(
         """SELECT COALESCE(
@@ -245,10 +252,36 @@ def tramitar(
     ).fetchone()[0]
     cursor = banco.execute(
         "INSERT INTO tramitacao (processo_id, unidade_origem_id, "
-        "unidade_destino_id, despacho, data_envio) VALUES (?, ?, ?, ?, ?)",
-        (processo_id, atual, unidade_destino_id, despacho, data_envio),
+        "unidade_destino_id, despacho, data_envio, prazo) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (processo_id, atual, unidade_destino_id, despacho, data_envio, prazo),
     )
     return cursor.lastrowid
+
+
+def processos_em_atraso(banco: sqlite3.Connection, referencia: str) -> list[dict]:
+    """Processos parados: última tramitação sem recebimento e prazo vencido.
+
+    Considera apenas a tramitação mais recente de cada processo; se ela
+    ainda não foi recebida e tem `prazo` anterior à data de `referencia`,
+    o processo está em atraso na unidade destino.
+    """
+    return [
+        {"processo_id": pid, "processo": f"{numero}/{ano}", "assunto": assunto,
+         "unidade_destino": destino, "prazo": prazo, "desde": envio}
+        for pid, numero, ano, assunto, destino, prazo, envio in banco.execute(
+            """SELECT p.id, p.numero, p.ano, p.assunto,
+                      u.nome, t.prazo, t.data_envio
+                 FROM tramitacao t
+                 JOIN processo p ON p.id = t.processo_id
+                 JOIN unidade u ON u.id = t.unidade_destino_id
+                WHERE t.id = (SELECT MAX(t2.id) FROM tramitacao t2
+                               WHERE t2.processo_id = t.processo_id)
+                  AND t.data_recebimento IS NULL
+                  AND t.prazo IS NOT NULL AND t.prazo < ?
+                ORDER BY t.prazo""", (referencia,),
+        )
+    ]
 
 
 # ------------------------------------------------------------------

@@ -52,7 +52,9 @@ from urllib.parse import parse_qs, urlparse
 
 PAGINA_WEB = Path(__file__).parent / "web" / "index.html"
 
-from sistema import autenticacao, compras, legislativo, servicos, transparencia
+from sistema import (
+    autenticacao, comissoes, compras, legislativo, servicos, transparencia,
+)
 from sistema.autenticacao import AcessoNegado, NaoAutenticado
 from sistema.demo import criar_banco
 from sistema.servicos import RegraViolada
@@ -266,9 +268,14 @@ class Aplicacao:
         tid = servicos.tramitar(
             self.banco, processo_id, dados["unidade_destino_id"],
             dados.get("despacho", ""), dados["data_envio"],
+            dados.get("prazo"),
         )
         self.banco.commit()
         return {"id": tid}
+
+    def processos_em_atraso(self, dados):
+        return servicos.processos_em_atraso(
+            self.banco, self.query_atual.get("referencia", [""])[0])
 
     def receber_tramitacao(self, tramitacao_id: int, dados):
         servicos.receber_tramitacao(self.banco, tramitacao_id,
@@ -339,9 +346,42 @@ class Aplicacao:
         return {"id": sessao_id, "numero": numero}
 
     def pautar(self, sessao_id: int, dados):
-        item = legislativo.pautar(self.banco, sessao_id, dados["proposicao_id"])
+        item = legislativo.pautar(
+            self.banco, sessao_id, dados["proposicao_id"],
+            urgencia=bool(dados.get("urgencia", False)))
         self.banco.commit()
         return {"id": item}
+
+    # ------------------------ comissões ----------------------------
+
+    def distribuir_relatoria(self, dados):
+        rid = comissoes.distribuir_relatoria(
+            self.banco, dados["proposicao_id"], dados["comissao"],
+            dados["relator_parlamentar_id"], dados["data"],
+            dados.get("prazo"),
+        )
+        self.banco.commit()
+        return {"id": rid}
+
+    def emitir_parecer(self, relatoria_id: int, dados):
+        pid = comissoes.emitir_parecer(
+            self.banco, relatoria_id, dados["tipo"], dados["ementa"],
+            dados["data"],
+        )
+        self.banco.commit()
+        return {"id": pid}
+
+    def aprovar_parecer(self, parecer_id: int):
+        comissoes.aprovar_parecer(self.banco, parecer_id)
+        self.banco.commit()
+        return {"id": parecer_id, "situacao": "APROVADO"}
+
+    def pareceres(self, proposicao_id: int):
+        return comissoes.pareceres(self.banco, proposicao_id)
+
+    def relatorias_em_atraso(self):
+        return comissoes.relatorias_em_atraso(
+            self.banco, self.query_atual.get("referencia", [""])[0])
 
     def votar(self, sessao_id: int, dados):
         votos = dados.get("votos")
@@ -442,6 +482,8 @@ ROTAS = [
      lambda app, m, d: app.tramitar(int(m.group(1)), d)),
     ("POST", r"^/tramitacoes/(\d+)/recebimento$", "PROTOCOLO",
      lambda app, m, d: app.receber_tramitacao(int(m.group(1)), d)),
+    ("GET", r"^/processos/atrasados$", "PROTOCOLO",
+     lambda app, m, d: app.processos_em_atraso(d)),
     ("POST", r"^/processos/(\d+)/(arquivamento|conclusao|desarquivamento)$",
      "PROTOCOLO",
      lambda app, m, d: app.situacao_processo(int(m.group(1)), m.group(2))),
@@ -466,6 +508,16 @@ ROTAS = [
      lambda app, m, d: app.votar(int(m.group(1)), d)),
     ("GET", r"^/sessoes/(\d+)/votacoes/(\d+)$", None,
      lambda app, m, d: app.placar(int(m.group(1)), int(m.group(2)))),
+    ("POST", r"^/relatorias$", "LEGISLATIVO",
+     lambda app, m, d: app.distribuir_relatoria(d)),
+    ("GET", r"^/relatorias/atrasadas$", "LEGISLATIVO",
+     lambda app, m, d: app.relatorias_em_atraso()),
+    ("POST", r"^/relatorias/(\d+)/parecer$", "LEGISLATIVO",
+     lambda app, m, d: app.emitir_parecer(int(m.group(1)), d)),
+    ("POST", r"^/pareceres/(\d+)/aprovacao$", "LEGISLATIVO",
+     lambda app, m, d: app.aprovar_parecer(int(m.group(1)))),
+    ("GET", r"^/proposicoes/(\d+)/pareceres$", None,
+     lambda app, m, d: app.pareceres(int(m.group(1)))),
     ("POST", r"^/fornecedores$", "COMPRAS",
      lambda app, m, d: app.cadastrar_fornecedor(d)),
     ("POST", r"^/contratacoes$", "COMPRAS",

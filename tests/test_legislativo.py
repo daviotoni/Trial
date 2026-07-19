@@ -2,7 +2,7 @@
 
 import unittest
 
-from sistema import legislativo
+from sistema import comissoes, legislativo
 from sistema.demo import criar_banco
 from sistema.servicos import RegraViolada
 
@@ -21,10 +21,22 @@ class TestLegislativo(unittest.TestCase):
     def tearDown(self):
         self.banco.close()
 
+    def _com_parecer_aprovado(self, proposicao):
+        """Distribui relatoria e aprova um parecer favorável (rito de mérito)."""
+        relatoria = comissoes.distribuir_relatoria(
+            self.banco, proposicao,
+            "Comissão de Legislação, Justiça e Redação Final",
+            self.vereadores[0], "2025-09-11")
+        parecer = comissoes.emitir_parecer(
+            self.banco, relatoria, "FAVORAVEL", "Parecer favorável.",
+            "2025-09-13")
+        comissoes.aprovar_parecer(self.banco, parecer)
+
     def _proposicao_pautada(self):
         proposicao, _ = legislativo.apresentar_proposicao(
             self.banco, "PL", "Ementa teste", "2025-09-10",
             autor_parlamentar_id=self.vereadores[0])
+        self._com_parecer_aprovado(proposicao)
         sessao, _ = legislativo.convocar_sessao(self.banco, "ORDINARIA",
                                                 "2025-09-16")
         legislativo.pautar(self.banco, sessao, proposicao)
@@ -105,6 +117,7 @@ class TestLegislativo(unittest.TestCase):
     def _plc_pautado(self):
         proposicao, _ = legislativo.apresentar_proposicao(
             self.banco, "PLC", "Altera a Lei Orgânica", "2025-09-10")
+        self._com_parecer_aprovado(proposicao)
         sessao, _ = legislativo.convocar_sessao(self.banco, "ORDINARIA",
                                                 "2025-09-16")
         legislativo.pautar(self.banco, sessao, proposicao)
@@ -135,6 +148,70 @@ class TestLegislativo(unittest.TestCase):
 
     def test_lista_de_comissoes_regimentais(self):
         self.assertEqual(len(legislativo.COMISSOES_PERMANENTES_REGIMENTAIS), 20)
+
+    def test_pl_sem_parecer_nao_entra_em_pauta(self):
+        proposicao, _ = legislativo.apresentar_proposicao(
+            self.banco, "PL", "Sem parecer", "2025-09-10")
+        sessao, _ = legislativo.convocar_sessao(self.banco, "ORDINARIA",
+                                                "2025-09-16")
+        with self.assertRaises(RegraViolada):
+            legislativo.pautar(self.banco, sessao, proposicao)
+
+    def test_urgencia_dispensa_parecer(self):
+        proposicao, _ = legislativo.apresentar_proposicao(
+            self.banco, "PL", "Urgente", "2025-09-10")
+        sessao, _ = legislativo.convocar_sessao(self.banco, "ORDINARIA",
+                                                "2025-09-16")
+        item = legislativo.pautar(self.banco, sessao, proposicao, urgencia=True)
+        self.assertIsNotNone(item)
+
+    def test_requerimento_dispensa_parecer(self):
+        # Matéria de expediente não depende de parecer de comissão.
+        proposicao, _ = legislativo.apresentar_proposicao(
+            self.banco, "REQUERIMENTO", "Requer informações", "2025-09-10")
+        sessao, _ = legislativo.convocar_sessao(self.banco, "ORDINARIA",
+                                                "2025-09-16")
+        item = legislativo.pautar(self.banco, sessao, proposicao)
+        self.assertIsNotNone(item)
+
+    def test_parecer_contrario_nao_impede_pauta(self):
+        # O parecer não vincula o Plenário: contrário, mas aprovado, libera.
+        proposicao, _ = legislativo.apresentar_proposicao(
+            self.banco, "PL", "Com parecer contrário", "2025-09-10")
+        relatoria = comissoes.distribuir_relatoria(
+            self.banco, proposicao,
+            "Comissão de Finanças e Orçamento", self.vereadores[1],
+            "2025-09-11")
+        parecer = comissoes.emitir_parecer(
+            self.banco, relatoria, "CONTRARIO", "Parecer contrário.",
+            "2025-09-13")
+        comissoes.aprovar_parecer(self.banco, parecer)
+        sessao, _ = legislativo.convocar_sessao(self.banco, "ORDINARIA",
+                                                "2025-09-16")
+        item = legislativo.pautar(self.banco, sessao, proposicao)
+        self.assertIsNotNone(item)
+
+    def test_relatoria_duplicada_ativa_bloqueada(self):
+        proposicao, _ = legislativo.apresentar_proposicao(
+            self.banco, "PL", "Dupla relatoria", "2025-09-10")
+        comissoes.distribuir_relatoria(
+            self.banco, proposicao, "Comissão de Transportes",
+            self.vereadores[0], "2025-09-11")
+        with self.assertRaises(RegraViolada):
+            comissoes.distribuir_relatoria(
+                self.banco, proposicao, "Comissão de Transportes",
+                self.vereadores[1], "2025-09-12")
+
+    def test_relatoria_em_atraso(self):
+        proposicao, _ = legislativo.apresentar_proposicao(
+            self.banco, "PL", "Prazo vencido", "2025-09-10")
+        comissoes.distribuir_relatoria(
+            self.banco, proposicao, "Comissão de Saúde e Assistência Social",
+            self.vereadores[0], "2025-09-11", prazo="2025-09-20")
+        atrasadas = comissoes.relatorias_em_atraso(self.banco, "2025-09-25")
+        self.assertEqual(len(atrasadas), 1)
+        self.assertEqual(atrasadas[0]["comissao"],
+                         "Comissão de Saúde e Assistência Social")
 
 
 if __name__ == "__main__":

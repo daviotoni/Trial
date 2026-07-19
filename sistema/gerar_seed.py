@@ -158,6 +158,17 @@ def gerar() -> str:
         for c, d, n, b, p, i in RUBRICAS
     ) + ";")
     out("")
+
+    # Comissões permanentes temáticas do Regimento Interno (art. 33).
+    # Fonte única: sistema.legislativo.COMISSOES_PERMANENTES_REGIMENTAIS.
+    from sistema.legislativo import COMISSOES_PERMANENTES_REGIMENTAIS
+
+    out("INSERT INTO comissao_permanente (id, nome) VALUES")
+    out(",\n".join(
+        f"  ({i}, {_sql(nome)})"
+        for i, nome in enumerate(COMISSOES_PERMANENTES_REGIMENTAIS, start=1)
+    ) + ";")
+    out("")
     return "\n".join(linhas)
 
 

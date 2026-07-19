@@ -145,3 +145,25 @@ INSERT INTO rubrica (codigo, descricao, natureza, base_legal, percentual_max, in
   ('AUX-REF', 'Auxílio-refeição (valor fixado por ato do Presidente)', 'ADICIONAL', 'Lei 3.226/2022, art. 17; Lei 3.525/2025, art. 4º', NULL, 0),
   ('AUX-LOC', 'Auxílio-locomoção (valor fixado por ato do Presidente)', 'ADICIONAL', 'Lei 3.226/2022, art. 17; Lei 3.525/2025, art. 4º', NULL, 0);
 
+INSERT INTO comissao_permanente (id, nome) VALUES
+  (1, 'Comissão de Legislação, Justiça e Redação Final'),
+  (2, 'Comissão de Finanças e Orçamento'),
+  (3, 'Comissão de Educação e Cultura'),
+  (4, 'Comissão de Saúde e Assistência Social'),
+  (5, 'Comissão de Transportes'),
+  (6, 'Comissão de Defesa do Consumidor'),
+  (7, 'Comissão de Obras e Serviços Públicos'),
+  (8, 'Comissão de Meio Ambiente e Qualidade de Vida'),
+  (9, 'Comissão de Fiscalização'),
+  (10, 'Comissão de Desenvolvimento Urbano'),
+  (11, 'Comissão dos Direitos da Mulher e da Criança e Adolescente'),
+  (12, 'Comissão da Defesa dos Direitos Humanos'),
+  (13, 'Comissão de Defesa dos Portadores de Necessidades Especiais'),
+  (14, 'Comissão de Segurança Alimentar e Nutricional'),
+  (15, 'Comissão de Segurança'),
+  (16, 'Comissão de Esporte, Lazer e Turismo'),
+  (17, 'Comissão de Prevenção e Combate às Drogas'),
+  (18, 'Comissão de Prevenção e Combate à Pirataria'),
+  (19, 'Comissão de Defesa dos Direitos dos Idosos'),
+  (20, 'Comissão de Defesa dos Direitos da Juventude');
+

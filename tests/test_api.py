@@ -167,6 +167,32 @@ class TestAPI(unittest.TestCase):
 
         _, sessao = requisitar(self.base, "POST", "/sessoes", {
             "tipo": "EXTRAORDINARIA", "data": "2025-10-05"})
+
+        # Matéria de mérito (PR) precisa de parecer de comissão antes da pauta.
+        codigo, bloqueio = requisitar(self.base, "POST",
+                                      f"/sessoes/{sessao['id']}/pauta",
+                                      {"proposicao_id": proposicao["id"]})
+        self.assertEqual(codigo, 422)
+        self.assertIn("parecer", bloqueio["erro"])
+
+        # Distribui relatoria, emite e aprova o parecer.
+        _, relatoria = requisitar(self.base, "POST", "/relatorias", {
+            "proposicao_id": proposicao["id"],
+            "comissao": "Comissão de Legislação, Justiça e Redação Final",
+            "relator_parlamentar_id": ids[0], "data": "2025-10-02",
+            "prazo": "2025-10-04"})
+        _, parecer = requisitar(
+            self.base, "POST", f"/relatorias/{relatoria['id']}/parecer",
+            {"tipo": "FAVORAVEL", "ementa": "Favorável.", "data": "2025-10-03"})
+        codigo, _ = requisitar(
+            self.base, "POST", f"/pareceres/{parecer['id']}/aprovacao", {})
+        self.assertEqual(codigo, 200)
+
+        codigo, lista = requisitar(
+            self.base, "GET", f"/proposicoes/{proposicao['id']}/pareceres")
+        self.assertEqual(codigo, 200)
+        self.assertEqual(lista[0]["situacao"], "APROVADO")
+
         codigo, _ = requisitar(self.base, "POST",
                                f"/sessoes/{sessao['id']}/pauta",
                                {"proposicao_id": proposicao["id"]})

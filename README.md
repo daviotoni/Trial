@@ -59,8 +59,10 @@ orgao/
 sistema/
   schema.sql      # banco do sistema de gestão (SQL portável: SQLite/PostgreSQL)
   gerar_seed.py   # carga inicial gerada a partir de orgao/cmdc.py
-  seed.sql        # seed gerado (unidades, símbolos, cargos, rubricas)
+  seed.sql        # seed gerado (unidades, símbolos, cargos, rubricas, comissões)
   demo.py         # cria o banco e roda consultas de verificação
+  legislativo.py  # proposições, sessões, pauta e votações
+  comissoes.py    # relatoria e pareceres de comissão (art. 33 do Regimento)
 docs/
   pesquisa-estrutura-cmdc.md      # relatório de pesquisa com fontes verificadas
   modelo-de-dados.md              # desenho do banco: módulos, entidades, regras
@@ -134,6 +136,17 @@ votações **nominais** (voto individual, apuração por maioria simples) ou
 simbólicas — com bloqueios para matéria fora de pauta ou já votada, e
 **maioria absoluta** para PLC (art. 178 do Regimento Interno).
 Demonstração: `python -m sistema.legislativo`.
+
+`sistema/comissoes.py` completa o rito: instrução da matéria nas comissões
+permanentes temáticas (art. 33 do Regimento Interno) — distribuição de
+**relatoria** a um vereador, com prazo, e emissão/aprovação do **parecer**
+(favorável, com emendas, contrário ou pela rejeição). Matéria de mérito
+(PL, PLC, PDL, PR) só entra em Ordem do Dia com parecer aprovado, **salvo
+regime de urgência**; o parecer não vincula o Plenário (parecer contrário,
+mas aprovado, libera a deliberação). Há controle de relatorias em atraso
+(prazo vencido). Demonstração: `python -m sistema.comissoes`. A tramitação
+de processos também passou a aceitar **prazo (SLA)** por passagem, com a
+consulta `processos_em_atraso` (rota `GET /processos/atrasados`).
 
 `sistema/compras.py` implementa o fluxo da Lei 14.133/2021: abertura de
 contratação com autuação automática, limites de dispensa do art. 75,
