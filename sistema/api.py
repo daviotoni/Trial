@@ -811,8 +811,13 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:",
                     continue
                 m = re.match(padrao, url.path)
                 if m:
-                    try:
-                        with aplicacao.trava:
+                    # Todo o ciclo (ação + commit/rollback) fica dentro da
+                    # trava: com uma única conexão compartilhada, transação
+                    # e desfazimento não podem se misturar entre requisições
+                    # (o PostgreSQL invalida a transação após qualquer erro
+                    # até o rollback).
+                    with aplicacao.trava:
+                        try:
                             usuario = aplicacao.sessoes.usuario(token)
                             if area == "*":
                                 if usuario is None:
@@ -821,24 +826,33 @@ def criar_servidor_http(porta: int = 8000, caminho_banco: str = ":memory:",
                                 autenticacao.exigir(aplicacao.banco, usuario, area)
                             aplicacao.usuario_atual = usuario
                             aplicacao.query_atual = parse_qs(url.query)
-                            return self._responder(200, acao(aplicacao, m, corpo))
-                    except NaoAutenticado as erro:
-                        return self._responder(401, {"erro": str(erro)})
-                    except AcessoNegado as erro:
-                        return self._responder(403, {"erro": str(erro)})
-                    except RegraViolada as erro:
-                        aplicacao.banco.rollback()
-                        return self._responder(422, {"erro": str(erro)})
-                    except Recurso404:
-                        return self._responder(404, {"erro": "não encontrado"})
-                    except sqlite3.IntegrityError as erro:
-                        aplicacao.banco.rollback()
-                        return self._responder(
-                            422, {"erro": f"violação de integridade: {erro}"})
-                    except KeyError as erro:
-                        aplicacao.banco.rollback()
-                        return self._responder(
-                            400, {"erro": f"campo obrigatório: {erro.args[0]}"})
+                            resultado = acao(aplicacao, m, corpo)
+                            aplicacao.banco.commit()
+                            return self._responder(200, resultado)
+                        except NaoAutenticado as erro:
+                            aplicacao.banco.rollback()
+                            return self._responder(401, {"erro": str(erro)})
+                        except AcessoNegado as erro:
+                            aplicacao.banco.rollback()
+                            return self._responder(403, {"erro": str(erro)})
+                        except RegraViolada as erro:
+                            aplicacao.banco.rollback()
+                            return self._responder(422, {"erro": str(erro)})
+                        except Recurso404:
+                            aplicacao.banco.rollback()
+                            return self._responder(404, {"erro": "não encontrado"})
+                        except sqlite3.IntegrityError as erro:
+                            aplicacao.banco.rollback()
+                            return self._responder(
+                                422, {"erro": f"violação de integridade: {erro}"})
+                        except KeyError as erro:
+                            aplicacao.banco.rollback()
+                            return self._responder(
+                                400, {"erro": f"campo obrigatório: {erro.args[0]}"})
+                        except Exception:
+                            aplicacao.banco.rollback()
+                            return self._responder(
+                                500, {"erro": "erro interno do servidor"})
             self._responder(404, {"erro": "rota inexistente"})
 
         def do_GET(self):
@@ -872,9 +886,11 @@ def main() -> None:
     parser.add_argument("--porta", type=int,
                         default=int(os.environ.get("PORT", 8000)))
     parser.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0"))
-    parser.add_argument("--banco", default=os.environ.get("CMDC_DB", "cmdc.db"),
-                        help="arquivo SQLite (padrão: cmdc.db; use um disco "
-                             "persistente em produção)")
+    parser.add_argument("--banco",
+                        default=os.environ.get("DATABASE_URL")
+                        or os.environ.get("CMDC_DB", "cmdc.db"),
+                        help="arquivo SQLite ou URL postgres:// (produção: "
+                             "defina DATABASE_URL, ex. Supabase)")
     argumentos = parser.parse_args()
 
     servidor = criar_servidor_http(argumentos.porta, argumentos.banco,

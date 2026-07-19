@@ -16,16 +16,37 @@ RAIZ = Path(__file__).parent
 
 
 def criar_banco(caminho: str = ":memory:",
-                multithread: bool = False) -> sqlite3.Connection:
+                multithread: bool = False):
     """Cria o banco com schema + seed e devolve a conexão.
 
-    Com multithread=True a conexão pode ser usada por várias threads —
-    o chamador deve serializar os acessos (a API usa um lock).
+    `caminho` pode ser um arquivo SQLite (local/testes) ou uma URL
+    postgres:// (produção — ex.: Supabase), atendida pelo adaptador em
+    sistema/bancodados. Com multithread=True a conexão pode ser usada por
+    várias threads — o chamador deve serializar os acessos (a API usa um
+    lock). Em ambos os casos o bootstrap é idempotente: schema + seed só
+    entram se o banco ainda estiver vazio.
     """
+    from sistema import bancodados
+
+    if bancodados.eh_url_postgres(caminho):
+        conexao = bancodados.ConexaoPostgres(caminho)
+        tem_schema = conexao.execute(
+            "SELECT to_regclass('public.unidade')").fetchone()[0]
+        if not tem_schema:
+            conexao.executescript(bancodados.schema_para_postgres(
+                (RAIZ / "schema.sql").read_text()))
+        # Seed em etapa própria: cobre banco cujo schema foi aplicado por
+        # fora (ex.: migração no Supabase) mas ainda sem dados.
+        vazio = conexao.execute(
+            "SELECT COUNT(*) FROM unidade").fetchone()[0] == 0
+        if vazio:
+            conexao.executescript(gerar())
+            conexao.executescript(bancodados.SETVAL_POS_SEED)
+        conexao.commit()
+        return conexao
+
     conexao = sqlite3.connect(caminho, check_same_thread=not multithread)
     conexao.execute("PRAGMA foreign_keys = ON")
-    # Idempotente: só cria schema + seed se o banco ainda estiver vazio.
-    # Permite reiniciar o servidor sobre um arquivo já existente (produção).
     ja_iniciado = conexao.execute(
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'unidade'"
     ).fetchone()

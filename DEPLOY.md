@@ -39,16 +39,31 @@ primeiro deploy, ou reinicie o serviço depois).
   recriado a cada reinício. Ótimo para **piloto/demonstração**; para uso
   real, veja abaixo.
 
-## Dados que persistem de verdade
+## Dados que persistem de verdade (Supabase — gratuito)
 
-Para o banco sobreviver a reinícios e atualizações, escolha uma opção:
+O sistema fala PostgreSQL nativamente (adaptador em
+`sistema/bancodados.py`). Basta apontar a variável **`DATABASE_URL`** para
+um banco Supabase e os dados passam a sobreviver a reinícios e
+atualizações. Passo a passo:
 
-1. **Disco no Render (mais simples)** — em um plano pago do serviço,
-   adicione um **Disk** montado em `/data` e defina a variável
-   **`CMDC_DB=/data/cmdc.db`**. O SQLite passa a viver no disco e persiste.
-2. **Banco PostgreSQL** — o `schema.sql` já é portável para PostgreSQL; é a
-   opção robusta para produção com muitos usuários (requer adaptar a camada
-   de acesso ao banco).
+1. No painel do Supabase (supabase.com/dashboard), abra o projeto e clique
+   em **Connect** (topo). Copie a URI do **Session pooler** (porta 5432) —
+   use o *pooler*, não a conexão direta (o Render não alcança a direta,
+   que é só IPv6).
+2. A URI traz `[YOUR-PASSWORD]`: pegue/defina a senha do banco em
+   **Project Settings → Database → Reset database password** e substitua.
+3. No Render, no serviço, abra **Environment** → **Add Environment
+   Variable**: chave `DATABASE_URL`, valor = a URI completa. Salve — o
+   serviço reinicia sozinho.
+4. No primeiro arranque o app cria o schema e a carga inicial no Supabase
+   (bootstrap idempotente); nas próximas, só reutiliza.
+
+Notas: no plano gratuito do Supabase o banco hiberna após ~1 semana sem
+uso (reativa no painel). As sessões de login vivem em memória — após um
+reinício do app é preciso entrar de novo (os dados permanecem).
+
+Alternativas: disco pago no Render (`CMDC_DB=/data/cmdc.db`) ou outro
+PostgreSQL qualquer via `DATABASE_URL`.
 
 ## Outras plataformas
 

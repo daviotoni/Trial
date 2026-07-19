@@ -1,3 +1,4 @@
-# O Sistema de Gestão da CMDC usa apenas a biblioteca padrão do Python.
-# Não há dependências externas — este arquivo existe só para o build
-# das plataformas de deploy reconhecerem o projeto como Python.
+# Em produção com PostgreSQL/Supabase (DATABASE_URL), o driver abaixo é
+# necessário. Local e testes usam SQLite (biblioteca padrão) e não
+# dependem dele.
+psycopg2-binary==2.9.10

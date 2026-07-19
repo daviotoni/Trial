@@ -143,6 +143,48 @@ CREATE TABLE folha_item (
 );
 
 -- ============================================================
+-- Módulo 9: Competências legais e fluxo processual
+-- ============================================================
+-- (Definido antes do Módulo 4 porque `processo` referencia
+-- `tipo_processo` — o PostgreSQL exige a tabela criada antes.)
+-- Traduz a Lei 3.525/2025 em regra operacional: cada unidade tem
+-- competências (o que a lei lhe atribui) e cada tipo de processo tem um
+-- rito — a sequência de setores por onde ele deve passar. É a base para
+-- "cada setor faz só o que lhe cabe e remete ao setor seguinte".
+
+-- Competências de cada unidade (fonte: orgao/cmdc.py → Lei 3.525/2025).
+CREATE TABLE competencia (
+    id         INTEGER PRIMARY KEY,
+    unidade_id INTEGER NOT NULL REFERENCES unidade (id),
+    descricao  TEXT NOT NULL,
+    base_legal TEXT
+);
+
+-- Tipo de processo (rito). Configurável — o caminho não é fixo no código.
+CREATE TABLE tipo_processo (
+    id      INTEGER PRIMARY KEY,
+    codigo  TEXT NOT NULL UNIQUE,      -- 'PL', 'COMPRA', 'OFICIO'...
+    nome    TEXT NOT NULL,
+    dominio TEXT NOT NULL CHECK (dominio IN ('LEGISLATIVO', 'ADMINISTRATIVO'))
+);
+
+-- Etapas ordenadas do rito: cada etapa é a passagem por uma unidade, com
+-- a ação que aquele setor executa e um prazo (SLA) sugerido.
+CREATE TABLE fluxo_etapa (
+    id               INTEGER PRIMARY KEY,
+    tipo_processo_id INTEGER NOT NULL REFERENCES tipo_processo (id),
+    ordem            INTEGER NOT NULL,
+    unidade_id       INTEGER NOT NULL REFERENCES unidade (id),
+    acao             TEXT NOT NULL,       -- o que a unidade faz nesta etapa
+    prazo_dias       INTEGER,             -- SLA sugerido para a etapa
+    obrigatoria      INTEGER NOT NULL DEFAULT 1 CHECK (obrigatoria IN (0, 1)),
+    UNIQUE (tipo_processo_id, ordem)
+);
+
+CREATE INDEX idx_competencia_unidade ON competencia (unidade_id);
+CREATE INDEX idx_fluxo_etapa_tipo ON fluxo_etapa (tipo_processo_id, ordem);
+
+-- ============================================================
 -- Módulo 4: Protocolo e tramitação
 -- ============================================================
 
@@ -420,46 +462,6 @@ CREATE TABLE unidade_acao (
     acao       TEXT NOT NULL,
     PRIMARY KEY (unidade_id, acao)
 );
-
--- ============================================================
--- Módulo 9: Competências legais e fluxo processual
--- ============================================================
--- Traduz a Lei 3.525/2025 em regra operacional: cada unidade tem
--- competências (o que a lei lhe atribui) e cada tipo de processo tem um
--- rito — a sequência de setores por onde ele deve passar. É a base para
--- "cada setor faz só o que lhe cabe e remete ao setor seguinte".
-
--- Competências de cada unidade (fonte: orgao/cmdc.py → Lei 3.525/2025).
-CREATE TABLE competencia (
-    id         INTEGER PRIMARY KEY,
-    unidade_id INTEGER NOT NULL REFERENCES unidade (id),
-    descricao  TEXT NOT NULL,
-    base_legal TEXT
-);
-
--- Tipo de processo (rito). Configurável — o caminho não é fixo no código.
-CREATE TABLE tipo_processo (
-    id      INTEGER PRIMARY KEY,
-    codigo  TEXT NOT NULL UNIQUE,      -- 'PL', 'COMPRA', 'OFICIO'...
-    nome    TEXT NOT NULL,
-    dominio TEXT NOT NULL CHECK (dominio IN ('LEGISLATIVO', 'ADMINISTRATIVO'))
-);
-
--- Etapas ordenadas do rito: cada etapa é a passagem por uma unidade, com
--- a ação que aquele setor executa e um prazo (SLA) sugerido.
-CREATE TABLE fluxo_etapa (
-    id               INTEGER PRIMARY KEY,
-    tipo_processo_id INTEGER NOT NULL REFERENCES tipo_processo (id),
-    ordem            INTEGER NOT NULL,
-    unidade_id       INTEGER NOT NULL REFERENCES unidade (id),
-    acao             TEXT NOT NULL,       -- o que a unidade faz nesta etapa
-    prazo_dias       INTEGER,             -- SLA sugerido para a etapa
-    obrigatoria      INTEGER NOT NULL DEFAULT 1 CHECK (obrigatoria IN (0, 1)),
-    UNIQUE (tipo_processo_id, ordem)
-);
-
-CREATE INDEX idx_competencia_unidade ON competencia (unidade_id);
-CREATE INDEX idx_fluxo_etapa_tipo ON fluxo_etapa (tipo_processo_id, ordem);
 
 -- Índices para as consultas mais frequentes
 CREATE INDEX idx_unidade_pai ON unidade (unidade_pai_id);
