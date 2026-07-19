@@ -83,6 +83,7 @@
   <button data-aba="compras" data-area="COMPRAS">Compras</button>
   <button data-aba="folha" data-area="FOLHA">Folha</button>
   <button data-aba="auditoria" data-area="CONTROLE">Auditoria</button>
+  <button data-aba="usuarios" data-area="USUARIOS">Usuários</button>
 </nav>
 <main>
 
@@ -109,6 +110,29 @@
     <p id="prop-vazia" style="display:none"></p>
     <table id="tabela-proposicoes" style="display:none">
       <thead><tr><th>Proposição</th><th>Assunto</th><th>Situação</th><th>Onde está agora</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="usuarios">
+  <div class="cartao">
+    <h2>Criar login de setor</h2>
+    <p style="color:#555">Cada login fica preso a um setor e só acessa as atividades daquele setor. O acesso vem da <b>unidade</b> escolhida.</p>
+    <label>Usuário (login)</label>
+    <input id="us-login" placeholder="ex.: gab.chiquinho">
+    <label>Senha (mínimo 8 caracteres)</label>
+    <input id="us-senha" type="password" placeholder="senha do setor">
+    <label>Setor (unidade)</label>
+    <select id="us-unidade"></select>
+    <button class="acao" id="btn-criar-usuario">Criar login</button>
+    <p id="msg-usuario" class="msg"></p>
+  </div>
+  <div class="cartao">
+    <h2>Logins existentes</h2>
+    <button class="acao" id="btn-recarregar-usuarios" style="margin-bottom:8px">Atualizar</button>
+    <table id="tabela-usuarios">
+      <thead><tr><th>Login</th><th>Setor / acesso</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -443,8 +467,57 @@ const aoEntrar = async () => {
   await carregarMeuSetor();
   await carregarCaixa();
   await carregarProposicoes();
+  if ((eu.areas || []).includes("USUARIOS")) {
+    await carregarUnidadesUsuario();
+    await carregarUsuarios();
+  }
   selecionarAba("caixa");
 };
+
+// ----- Usuários (criar logins de setor) -----
+const carregarUnidadesUsuario = async () => {
+  const sel = document.getElementById("us-unidade");
+  if (sel.dataset.carregado) return;
+  const unidades = await consultar("/unidades");
+  sel.innerHTML = '<option value="ADMIN">— Administrador (vê tudo) —</option>' +
+    unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join("");
+  sel.dataset.carregado = "1";
+};
+const carregarUsuarios = async () => {
+  const corpo = document.querySelector("#tabela-usuarios tbody");
+  try {
+    const lista = await consultar("/usuarios");
+    corpo.innerHTML = lista.length ? "" : "<tr><td colspan=2>Nenhum usuário.</td></tr>";
+    lista.forEach(u => {
+      const tr = document.createElement("tr");
+      const acesso = u.unidade
+        || (u.perfil === "ADMIN" ? "Administrador (vê tudo)" : u.perfil);
+      tr.innerHTML = `<td>${u.login}</td><td>${acesso}</td>`;
+      corpo.appendChild(tr);
+    });
+  } catch (e) { corpo.innerHTML = `<tr><td colspan=2>${e.message}</td></tr>`; }
+};
+document.getElementById("btn-recarregar-usuarios")
+  .addEventListener("click", carregarUsuarios);
+document.getElementById("btn-criar-usuario").addEventListener("click", async () => {
+  const login = document.getElementById("us-login").value.trim();
+  const senha = document.getElementById("us-senha").value;
+  const unidade = document.getElementById("us-unidade").value;
+  if (!login || senha.length < 8) {
+    mostrar("msg-usuario", "Informe o login e uma senha de 8+ caracteres.", "erro");
+    return;
+  }
+  try {
+    const corpo = unidade === "ADMIN"
+      ? { login, senha, perfil: "ADMIN" }
+      : { login, senha, unidade_id: Number(unidade) };
+    await enviar("/usuarios", corpo);
+    mostrar("msg-usuario", `Login "${login}" criado com sucesso.`, "ok");
+    document.getElementById("us-login").value = "";
+    document.getElementById("us-senha").value = "";
+    carregarUsuarios();
+  } catch (e) { mostrar("msg-usuario", e.message, "erro"); }
+});
 
 document.getElementById("btn-login").addEventListener("click", async () => {
   if (localStorage.getItem("perfil")) {

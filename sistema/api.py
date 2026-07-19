@@ -88,14 +88,32 @@ class Aplicacao:
                 "perfil": usuario["perfil"]}
 
     def criar_usuario(self, dados):
+        # O acesso vem da unidade (setor). O 'perfil' é rótulo legado: só
+        # importa distinguir ADMIN. Sem perfil e com unidade → não-admin.
+        perfil = dados.get("perfil")
+        unidade_id = dados.get("unidade_id")
+        if not perfil:
+            if unidade_id:
+                perfil = "LEGISLATIVO"  # rótulo neutro; alçada vem da unidade
+            else:
+                raise RegraViolada("informe o setor do usuário")
         try:
             uid = autenticacao.criar_usuario(
-                self.banco, dados["login"], dados["senha"], dados["perfil"],
-                dados.get("servidor_id"), dados.get("unidade_id"))
+                self.banco, dados["login"], dados["senha"], perfil,
+                dados.get("servidor_id"), unidade_id)
         except ValueError as erro:
             raise RegraViolada(str(erro))
         self.banco.commit()
         return {"id": uid}
+
+    def listar_usuarios(self):
+        return [
+            {"login": login, "perfil": perfil, "unidade": unidade}
+            for login, perfil, unidade in self.banco.execute(
+                """SELECT u.login, u.perfil, un.nome
+                     FROM usuario u LEFT JOIN unidade un ON un.id = u.unidade_id
+                    WHERE u.ativo = 1 ORDER BY u.login""")
+        ]
 
     def eu(self):
         """Identidade e alçada do usuário logado (para a interface)."""
@@ -585,6 +603,7 @@ class Aplicacao:
 ROTAS = [
     ("POST", r"^/login$", None, lambda app, m, d: app.login(d)),
     ("POST", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.criar_usuario(d)),
+    ("GET", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.listar_usuarios()),
     ("GET", r"^/me$", "*", lambda app, m, d: app.eu()),
     ("GET", r"^/caixa$", "*", lambda app, m, d: app.caixa()),
     ("GET", r"^/minhas-proposicoes$", "*",

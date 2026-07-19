@@ -399,6 +399,27 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(codigo, 403)
         self.assertIn("competência", erro["erro"])
 
+    def test_criar_usuario_por_setor_e_listar(self):
+        _, unidades = requisitar(self.base, "GET", "/unidades")
+        gab = next(u for u in unidades
+                   if u["nome"].startswith("Gabinete do(a)"))
+        # Cria sem informar perfil — o acesso vem do setor (unidade).
+        codigo, _ = requisitar(self.base, "POST", "/usuarios", {
+            "login": "setor.teste", "senha": "senha123",
+            "unidade_id": gab["id"]})
+        self.assertEqual(codigo, 200)
+        # O login criado consegue autenticar e herda a área do gabinete.
+        _, s = requisitar(self.base, "POST", "/login",
+                          {"login": "setor.teste", "senha": "senha123"},
+                          token=False)
+        _, eu = requisitar(self.base, "GET", "/me", token=s["token"])
+        self.assertEqual(eu["areas"], ["LEGISLATIVO"])
+        # A listagem (alçada USUARIOS) mostra o login com o setor.
+        codigo, lista = requisitar(self.base, "GET", "/usuarios")
+        self.assertEqual(codigo, 200)
+        alvo = next(u for u in lista if u["login"] == "setor.teste")
+        self.assertTrue(alvo["unidade"].startswith("Gabinete do(a)"))
+
     def test_escrita_sem_login_retorna_401(self):
         codigo, erro = requisitar(self.base, "POST", "/processos", {
             "tipo": "ADMINISTRATIVO", "assunto": "X",
