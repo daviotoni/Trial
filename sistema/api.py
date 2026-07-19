@@ -353,6 +353,37 @@ class Aplicacao:
             })
         return caixa
 
+    def minhas_proposicoes(self):
+        """Todas as proposições/processos ORIGINADOS pelo setor do usuário,
+        onde quer que estejam agora — o acompanhamento completo.
+
+        Diferente da caixa (o que está com o setor agora), aqui o gabinete
+        vê tudo o que apresentou e a localização atual de cada um.
+        """
+        u = self.usuario_atual
+        uid = u.get("unidade_id")
+        if not uid:
+            return []
+        linhas = self.banco.execute(
+            """SELECT p.id, p.numero, p.ano, p.assunto, p.situacao,
+                      COALESCE(
+                        (SELECT ud.nome FROM tramitacao t
+                           JOIN unidade ud ON ud.id = t.unidade_destino_id
+                          WHERE t.processo_id = p.id ORDER BY t.id DESC LIMIT 1),
+                        (SELECT uo.nome FROM unidade uo
+                          WHERE uo.id = p.unidade_origem_id)),
+                      (SELECT pr.tipo || ' ' || pr.numero || '/' || pr.ano
+                         FROM proposicao pr WHERE pr.processo_id = p.id LIMIT 1)
+                 FROM processo p
+                WHERE p.unidade_origem_id = ?
+                ORDER BY p.id DESC""", (uid,),
+        ).fetchall()
+        return [
+            {"id": pid, "numero": f"{numero}/{ano}", "assunto": assunto,
+             "situacao": situacao, "localizacao": loc, "proposicao": prop}
+            for pid, numero, ano, assunto, situacao, loc, prop in linhas
+        ]
+
     def tramitar_pelo_fluxo(self, processo_id: int, dados):
         autenticacao.exigir_posse(self.banco, self.usuario_atual, processo_id)
         etapa = fluxo.tramitar_pelo_fluxo(
@@ -556,6 +587,8 @@ ROTAS = [
     ("POST", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.criar_usuario(d)),
     ("GET", r"^/me$", "*", lambda app, m, d: app.eu()),
     ("GET", r"^/caixa$", "*", lambda app, m, d: app.caixa()),
+    ("GET", r"^/minhas-proposicoes$", "*",
+     lambda app, m, d: app.minhas_proposicoes()),
     ("GET", r"^/organograma$", None, lambda app, m, d: app.organograma()),
     ("GET", r"^/unidades$", None, lambda app, m, d: app.unidades()),
     ("GET", r"^/cargos$", None, lambda app, m, d: app.cargos()),

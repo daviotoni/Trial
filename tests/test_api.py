@@ -334,6 +334,42 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(item["proxima_unidade"],
                          "Coordenadoria da Secretaria-Geral")
 
+    def test_minhas_proposicoes_acompanha_apos_encaminhar(self):
+        _, unidades = requisitar(self.base, "GET", "/unidades")
+        gab = next(u for u in unidades
+                   if u["nome"].startswith("Gabinete do(a)"))
+        requisitar(self.base, "POST", "/usuarios", {
+            "login": "gab.acomp", "senha": "senha123", "perfil": "LEGISLATIVO",
+            "unidade_id": gab["id"]})
+        _, proc = requisitar(self.base, "POST", "/processos", {
+            "tipo": "LEGISLATIVO", "assunto": "PL para acompanhar",
+            "unidade_origem_id": gab["id"], "data_autuacao": "2025-09-10"})
+        requisitar(self.base, "POST", f"/processos/{proc['id']}/tipo",
+                   {"tipo": "PL"})
+        _, s = requisitar(self.base, "POST", "/login",
+                          {"login": "gab.acomp", "senha": "senha123"},
+                          token=False)
+        tk = s["token"]
+
+        # Antes de encaminhar: aparece nas proposições, localizado no gabinete.
+        _, lista = requisitar(self.base, "GET", "/minhas-proposicoes", token=tk)
+        item = next(p for p in lista if p["assunto"] == "PL para acompanhar")
+        self.assertTrue(item["localizacao"].startswith("Gabinete do(a)"))
+
+        # Gabinete encaminha pelo rito (sai da caixa dele).
+        requisitar(self.base, "POST",
+                   f"/processos/{proc['id']}/tramitar-fluxo",
+                   {"data_envio": "2025-09-11"}, token=tk)
+
+        # Continua nas proposições, agora localizado na Secretaria-Geral.
+        _, lista2 = requisitar(self.base, "GET", "/minhas-proposicoes", token=tk)
+        item2 = next(p for p in lista2 if p["assunto"] == "PL para acompanhar")
+        self.assertEqual(item2["localizacao"], "Coordenadoria da Secretaria-Geral")
+        # E saiu da caixa (não está mais no gabinete).
+        _, caixa = requisitar(self.base, "GET", "/caixa", token=tk)
+        self.assertNotIn("PL para acompanhar",
+                         {p["assunto"] for p in caixa})
+
     def test_escrita_sem_login_retorna_401(self):
         codigo, erro = requisitar(self.base, "POST", "/processos", {
             "tipo": "ADMINISTRATIVO", "assunto": "X",

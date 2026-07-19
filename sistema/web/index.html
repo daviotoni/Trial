@@ -76,6 +76,7 @@
   <button data-aba="painel" data-area="__publico" class="ativa">Painel</button>
   <button data-aba="organograma" data-area="__publico">Organograma</button>
   <button data-aba="caixa" data-area="__login">Minha caixa</button>
+  <button data-aba="proposicoes-setor" data-area="__login">Minhas proposições</button>
   <button data-aba="cargos" data-area="PESSOAL">Cargos e vagas</button>
   <button data-aba="protocolo" data-area="PROTOCOLO">Protocolo</button>
   <button data-aba="plenario" data-area="LEGISLATIVO">Plenário</button>
@@ -98,6 +99,18 @@
   <div class="cartao">
     <h3 style="margin-top:0">Competências do meu setor (Lei nº 3.525/2025)</h3>
     <ul id="lista-competencias"><li>—</li></ul>
+  </div>
+</section>
+
+<section id="proposicoes-setor">
+  <div class="cartao">
+    <h2>Minhas proposições <small id="prop-setor" style="font-weight:normal"></small></h2>
+    <p style="color:#555">Todas as proposições que o seu setor apresentou — e onde cada uma está agora, mesmo já encaminhada.</p>
+    <p id="prop-vazia" style="display:none"></p>
+    <table id="tabela-proposicoes" style="display:none">
+      <thead><tr><th>Proposição</th><th>Assunto</th><th>Situação</th><th>Onde está agora</th></tr></thead>
+      <tbody></tbody>
+    </table>
   </div>
 </section>
 
@@ -364,6 +377,44 @@ const carregarCaixa = async () => {
   }
 };
 
+const SIT_ROTULO = {
+  EM_TRAMITACAO: "Em tramitação", SOBRESTADO: "Sobrestado",
+  ARQUIVADO: "Arquivado", CONCLUIDO: "Concluído",
+};
+const carregarProposicoes = async () => {
+  const tabela = document.getElementById("tabela-proposicoes");
+  const corpo = tabela.querySelector("tbody");
+  const vazia = document.getElementById("prop-vazia");
+  document.getElementById("prop-setor").textContent =
+    localStorage.getItem("unidade") ? "— " + localStorage.getItem("unidade") : "";
+  if (!localStorage.getItem("token")) {
+    tabela.style.display = "none"; vazia.style.display = "";
+    vazia.textContent = "Faça login como um setor para acompanhar suas proposições.";
+    return;
+  }
+  try {
+    const lista = await consultar("/minhas-proposicoes");
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazia.style.display = "";
+      vazia.textContent = "Este setor ainda não apresentou proposições.";
+      return;
+    }
+    vazia.style.display = "none"; tabela.style.display = "";
+    lista.forEach(p => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${p.proposicao || "Processo " + p.numero}</td>` +
+        `<td>${p.assunto}</td>` +
+        `<td>${SIT_ROTULO[p.situacao] || p.situacao}</td>` +
+        `<td><strong>${p.localizacao || "—"}</strong></td>`;
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazia.style.display = "";
+    vazia.textContent = e.message;
+  }
+};
+
 const mostrarStatusLogin = () => {
   const status = document.getElementById("login-status");
   const perfil = localStorage.getItem("perfil");
@@ -391,13 +442,15 @@ const aoEntrar = async () => {
   aplicarPermissoes();
   await carregarMeuSetor();
   await carregarCaixa();
+  await carregarProposicoes();
   selecionarAba("caixa");
 };
 
 document.getElementById("btn-login").addEventListener("click", async () => {
   if (localStorage.getItem("perfil")) {
     localStorage.clear();
-    mostrarStatusLogin(); aplicarPermissoes(); carregarCaixa();
+    mostrarStatusLogin(); aplicarPermissoes();
+    carregarCaixa(); carregarProposicoes();
     selecionarAba("painel");
     return;
   }
@@ -415,6 +468,7 @@ document.getElementById("btn-login").addEventListener("click", async () => {
 mostrarStatusLogin();
 aplicarPermissoes();
 carregarCaixa();
+carregarProposicoes();
 const mostrar = (id, texto, tipo) => {
   const alvo = document.getElementById(id);
   alvo.textContent = texto; alvo.className = "msg " + tipo;

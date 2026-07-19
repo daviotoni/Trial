@@ -92,6 +92,55 @@ COORDENADORIAS = [
     "Diretoria Administrativa",
 ]
 
+# Competência funcional de cada coordenadoria (2º grau). Descrições fiéis
+# ao papel de cada setor; base normativa: Lei 3.525/2025. Coordenadorias
+# não listadas recebem uma competência genérica de apoio administrativo.
+COMPETENCIAS_COORDENADORIA = {
+    "Coordenadoria da Secretaria-Geral":
+        "Protocolo-geral, autuação, numeração e tramitação de processos "
+        "administrativos e legislativos",
+    "Coordenadoria de Recursos Humanos":
+        "Gestão de pessoal: cadastro, provimento, lotação e vida funcional "
+        "dos servidores",
+    "Coordenadoria de Apoio Legislativo":
+        "Apoio ao processo legislativo e às sessões plenárias",
+    "Coordenadoria de Assuntos de Plenário":
+        "Suporte à ordem do dia e aos trabalhos de Plenário",
+    "Coordenadoria de Atas e Projetos":
+        "Elaboração de atas das sessões e autuação de projetos e proposições",
+    "Coordenadoria de Redação Oficial e Legislativa":
+        "Redação final de autógrafos, leis e atos normativos",
+    "Coordenadoria de Licitações e Contratos":
+        "Formalização e gestão de licitações e contratos (Lei 14.133/2021)",
+    "Coordenadoria de Material":
+        "Gestão de material e almoxarifado; termo de referência e pesquisa "
+        "de preços",
+    "Coordenadoria de Avaliação e Acompanhamento de Compras":
+        "Fiscalização e acompanhamento das aquisições e contratações",
+    "Coordenadoria de Contabilidade":
+        "Escrituração contábil, empenho e execução orçamentária",
+    "Coordenadoria de Finanças":
+        "Gestão financeira, pagamentos e conciliação",
+    "Coordenadoria de Patrimônio":
+        "Registro, controle e baixa dos bens patrimoniais",
+    "Coordenadoria de Publicações e Transparência":
+        "Publicação oficial dos atos e transparência ativa (LAI)",
+    "Coordenadoria de Cerimonial e Comunicação Social":
+        "Cerimonial, comunicação institucional e imprensa",
+    "Coordenadoria de Documentação Histórica":
+        "Guarda e preservação do acervo documental e histórico",
+    "Coordenadoria de Tecnologia da Informação e Comunicação":
+        "Gestão dos sistemas e da infraestrutura de tecnologia da informação",
+    "Coordenadoria de Polícia Legislativa":
+        "Segurança institucional e poder de polícia no âmbito da Câmara",
+    "Coordenadoria de Prevenção a Incêndio":
+        "Prevenção e combate a incêndio e segurança predial",
+    "Coordenadoria de Manutenção":
+        "Manutenção predial e das instalações",
+    "Diretoria Administrativa":
+        "Coordenação dos serviços administrativos e auxiliares",
+}
+
 # 3º grau — Órgãos de Assessoramento Parlamentar, lotados nos gabinetes
 # (art. 3º, §2º).
 ASSESSORAMENTO_PARLAMENTAR = [
@@ -331,6 +380,9 @@ def construir_cmdc() -> Orgao:
         unidade = diretoria_geral.adicionar_subunidade(
             UnidadeAdministrativa(nome=nome)
         )
+        descricao = COMPETENCIAS_COORDENADORIA.get(
+            nome, "Coordenadoria de apoio administrativo (2º grau)")
+        unidade.adicionar_competencia(Competencia(descricao, LEI_3525))
         _cargo_dirigente(unidade)
     _cargo_dirigente(diretoria_geral)
 
