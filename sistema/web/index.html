@@ -73,16 +73,33 @@
   </div>
 </header>
 <nav id="menu">
-  <button data-aba="painel" class="ativa">Painel</button>
-  <button data-aba="organograma">Organograma</button>
-  <button data-aba="cargos">Cargos e vagas</button>
-  <button data-aba="protocolo">Protocolo</button>
-  <button data-aba="plenario">Plenário</button>
-  <button data-aba="compras">Compras</button>
-  <button data-aba="folha">Folha</button>
-  <button data-aba="auditoria">Auditoria</button>
+  <button data-aba="painel" data-area="__publico" class="ativa">Painel</button>
+  <button data-aba="organograma" data-area="__publico">Organograma</button>
+  <button data-aba="caixa" data-area="__login">Minha caixa</button>
+  <button data-aba="cargos" data-area="PESSOAL">Cargos e vagas</button>
+  <button data-aba="protocolo" data-area="PROTOCOLO">Protocolo</button>
+  <button data-aba="plenario" data-area="LEGISLATIVO">Plenário</button>
+  <button data-aba="compras" data-area="COMPRAS">Compras</button>
+  <button data-aba="folha" data-area="FOLHA">Folha</button>
+  <button data-aba="auditoria" data-area="CONTROLE">Auditoria</button>
 </nav>
 <main>
+
+<section id="caixa">
+  <div class="cartao">
+    <h2>Minha caixa <small id="caixa-setor" style="font-weight:normal"></small></h2>
+    <p id="caixa-vazia" style="display:none">Faça login como um setor para ver os processos que estão com você.</p>
+    <table id="tabela-caixa" style="display:none">
+      <thead><tr><th>Processo</th><th>Assunto</th><th>Próximo setor</th><th>Ação prevista</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="msg-caixa" class="msg"></p>
+  </div>
+  <div class="cartao">
+    <h3 style="margin-top:0">Competências do meu setor (Lei nº 3.525/2025)</h3>
+    <ul id="lista-competencias"><li>—</li></ul>
+  </div>
+</section>
 
 <section id="painel" class="ativa">
   <div class="cartao">
@@ -264,12 +281,95 @@ const enviar = (caminho, dados) => consultar(caminho, {
   body: JSON.stringify(dados),
 });
 
-// Login
+// Login + acesso por setor
+const selecionarAba = (aba) => {
+  document.querySelectorAll("nav button").forEach(
+    b => b.classList.toggle("ativa", b.dataset.aba === aba));
+  document.querySelectorAll("main section").forEach(
+    s => s.classList.toggle("ativa", s.id === aba));
+};
+
+// Mostra no menu só as abas que o setor do usuário pode operar.
+const aplicarPermissoes = () => {
+  const logado = !!localStorage.getItem("token");
+  const areas = JSON.parse(localStorage.getItem("areas") || "[]");
+  const temUnidade = !!localStorage.getItem("unidade_id");
+  document.querySelectorAll("#menu button").forEach(b => {
+    const area = b.dataset.area;
+    let ver;
+    if (area === "__publico") ver = true;
+    else if (area === "__login") ver = logado && temUnidade;
+    else ver = logado && areas.includes(area);
+    b.style.display = ver ? "" : "none";
+  });
+  const ativa = document.querySelector("#menu button.ativa");
+  if (ativa && ativa.style.display === "none") selecionarAba("painel");
+};
+
+const carregarMeuSetor = async () => {
+  const setor = document.getElementById("caixa-setor");
+  const lista = document.getElementById("lista-competencias");
+  const uid = localStorage.getItem("unidade_id");
+  setor.textContent = localStorage.getItem("unidade")
+    ? "— " + localStorage.getItem("unidade") : "";
+  if (!uid) { lista.innerHTML = "<li>—</li>"; return; }
+  try {
+    const comps = await consultar(`/unidades/${uid}/competencias`);
+    lista.innerHTML = comps.length
+      ? comps.map(c => `<li>${c.descricao}</li>`).join("")
+      : "<li>Sem competências cadastradas para este setor.</li>";
+  } catch (e) { lista.innerHTML = "<li>—</li>"; }
+};
+
+const carregarCaixa = async () => {
+  const tabela = document.getElementById("tabela-caixa");
+  const corpo = tabela.querySelector("tbody");
+  const vazia = document.getElementById("caixa-vazia");
+  if (!localStorage.getItem("token")) {
+    tabela.style.display = "none"; vazia.style.display = "";
+    vazia.textContent = "Faça login como um setor para ver os processos que estão com você.";
+    return;
+  }
+  try {
+    const lista = await consultar("/caixa");
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazia.style.display = "";
+      vazia.textContent = "Nenhum processo na sua caixa agora.";
+      return;
+    }
+    vazia.style.display = "none"; tabela.style.display = "";
+    lista.forEach(p => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${p.numero}</td><td>${p.assunto}</td>` +
+        `<td>${p.proxima_unidade || "—"}</td><td>${p.proxima_acao || "—"}</td><td></td>`;
+      if (p.proxima_unidade) {
+        const b = document.createElement("button");
+        b.className = "acao"; b.textContent = "Encaminhar →";
+        b.addEventListener("click", async () => {
+          try {
+            await enviar(`/processos/${p.id}/tramitar-fluxo`,
+                         {data_envio: new Date().toISOString().slice(0, 10)});
+            mostrar("msg-caixa", `Processo ${p.numero} encaminhado para ${p.proxima_unidade}.`, "ok");
+            carregarCaixa();
+          } catch (e) { mostrar("msg-caixa", e.message, "erro"); }
+        });
+        tr.lastChild.appendChild(b);
+      }
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazia.style.display = "";
+    vazia.textContent = e.message;
+  }
+};
+
 const mostrarStatusLogin = () => {
   const status = document.getElementById("login-status");
   const perfil = localStorage.getItem("perfil");
   if (perfil) {
-    status.textContent = `${localStorage.getItem("usuario")} (${perfil})`;
+    const unidade = localStorage.getItem("unidade");
+    status.textContent = `${localStorage.getItem("usuario")} · ${unidade || perfil}`;
     document.getElementById("btn-login").textContent = "Sair";
     document.getElementById("login-usuario").style.display = "none";
     document.getElementById("login-senha").style.display = "none";
@@ -280,23 +380,41 @@ const mostrarStatusLogin = () => {
     document.getElementById("login-senha").style.display = "";
   }
 };
+
+const aoEntrar = async () => {
+  const eu = await consultar("/me");
+  localStorage.setItem("perfil", eu.perfil);
+  localStorage.setItem("areas", JSON.stringify(eu.areas || []));
+  if (eu.unidade_id) localStorage.setItem("unidade_id", eu.unidade_id);
+  if (eu.unidade) localStorage.setItem("unidade", eu.unidade);
+  mostrarStatusLogin();
+  aplicarPermissoes();
+  await carregarMeuSetor();
+  await carregarCaixa();
+  selecionarAba("caixa");
+};
+
 document.getElementById("btn-login").addEventListener("click", async () => {
   if (localStorage.getItem("perfil")) {
-    localStorage.clear(); mostrarStatusLogin(); return;
+    localStorage.clear();
+    mostrarStatusLogin(); aplicarPermissoes(); carregarCaixa();
+    selecionarAba("painel");
+    return;
   }
   const usuario = document.getElementById("login-usuario").value;
   try {
     const sessao = await enviar("/login", {
       login: usuario, senha: document.getElementById("login-senha").value});
     localStorage.setItem("token", sessao.token);
-    localStorage.setItem("perfil", sessao.perfil);
     localStorage.setItem("usuario", usuario);
-    mostrarStatusLogin();
+    await aoEntrar();
   } catch (erro) {
     document.getElementById("login-status").textContent = "✗ " + erro.message;
   }
 });
 mostrarStatusLogin();
+aplicarPermissoes();
+carregarCaixa();
 const mostrar = (id, texto, tipo) => {
   const alvo = document.getElementById(id);
   alvo.textContent = texto; alvo.className = "msg " + tipo;

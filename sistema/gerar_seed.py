@@ -174,6 +174,12 @@ def gerar() -> str:
             base = str(c.base_legal) if c.base_legal else None
             comp_rows.append(f"  ({ids[id(u)]}, {_sql(c.descricao)}, {_sql(base)})")
         fila.extend(u.subunidades)
+    # Competência de cada gabinete (exercício do mandato parlamentar).
+    COMP_GABINETE = ("Exercício do mandato parlamentar: autoria e "
+                     "apresentação de proposições (art. 3º, §2º)")
+    for gid in gab_ids:
+        comp_rows.append(
+            f"  ({gid}, {_sql(COMP_GABINETE)}, {_sql('Lei 3.525/2025')})")
     if comp_rows:
         out("INSERT INTO competencia (unidade_id, descricao, base_legal) VALUES")
         out(",\n".join(comp_rows) + ";")

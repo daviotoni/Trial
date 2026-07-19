@@ -318,6 +318,41 @@ class Aplicacao:
         prox = fluxo.proxima_etapa(self.banco, processo_id)
         return prox if prox is not None else {"proxima_etapa": None}
 
+    def caixa(self):
+        """Processos que estão AGORA na unidade do usuário logado.
+
+        É a "caixa do setor": cada um com a próxima etapa do rito, para o
+        servidor conduzir só o que está com ele.
+        """
+        u = self.usuario_atual
+        uid = u.get("unidade_id")
+        if uid:
+            linhas = self.banco.execute(
+                """SELECT p.id, p.numero, p.ano, p.assunto, p.data_autuacao
+                     FROM processo p
+                    WHERE p.situacao = 'EM_TRAMITACAO' AND COALESCE(
+                      (SELECT unidade_destino_id FROM tramitacao t
+                        WHERE t.processo_id = p.id ORDER BY t.id DESC LIMIT 1),
+                      p.unidade_origem_id) = ?
+                    ORDER BY p.id""", (uid,),
+            ).fetchall()
+        else:
+            # Sem lotação (admin): mostra tudo que está em tramitação.
+            linhas = self.banco.execute(
+                "SELECT id, numero, ano, assunto, data_autuacao FROM processo "
+                "WHERE situacao = 'EM_TRAMITACAO' ORDER BY id"
+            ).fetchall()
+        caixa = []
+        for pid, numero, ano, assunto, data in linhas:
+            prox = fluxo.proxima_etapa(self.banco, pid)
+            caixa.append({
+                "id": pid, "numero": f"{numero}/{ano}", "assunto": assunto,
+                "data_autuacao": data,
+                "proxima_unidade": prox["unidade"] if prox else None,
+                "proxima_acao": prox["acao"] if prox else None,
+            })
+        return caixa
+
     def tramitar_pelo_fluxo(self, processo_id: int, dados):
         autenticacao.exigir_posse(self.banco, self.usuario_atual, processo_id)
         etapa = fluxo.tramitar_pelo_fluxo(
@@ -520,6 +555,7 @@ ROTAS = [
     ("POST", r"^/login$", None, lambda app, m, d: app.login(d)),
     ("POST", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.criar_usuario(d)),
     ("GET", r"^/me$", "*", lambda app, m, d: app.eu()),
+    ("GET", r"^/caixa$", "*", lambda app, m, d: app.caixa()),
     ("GET", r"^/organograma$", None, lambda app, m, d: app.organograma()),
     ("GET", r"^/unidades$", None, lambda app, m, d: app.unidades()),
     ("GET", r"^/cargos$", None, lambda app, m, d: app.cargos()),

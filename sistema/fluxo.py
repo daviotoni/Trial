@@ -155,10 +155,32 @@ def proxima_etapa(banco: sqlite3.Connection, processo_id: int) -> dict | None:
     atual = _unidade_atual(banco, processo_id)
     indices = [i for i, e in enumerate(rito) if e["unidade_id"] == atual]
     if not indices:
+        # Sem correspondência exata: a unidade atual pode ser subordinada à
+        # unidade de uma etapa (ex.: um gabinete específico está sob o nó
+        # "Gabinetes de Vereadores" da etapa 1).
+        indices = [i for i, e in enumerate(rito)
+                   if _eh_subordinada(banco, atual, e["unidade_id"])]
+    if not indices:
         # Ainda não entrou no rito: a próxima é a primeira etapa.
         return rito[0]
     prox = indices[-1] + 1
     return rito[prox] if prox < len(rito) else None
+
+
+def _eh_subordinada(banco: sqlite3.Connection, unidade_id: int | None,
+                    ancestral_id: int) -> bool:
+    """A unidade é a própria `ancestral_id` ou uma subordinada a ela?"""
+    atual = unidade_id
+    vistos = set()
+    while atual is not None and atual not in vistos:
+        if atual == ancestral_id:
+            return True
+        vistos.add(atual)
+        linha = banco.execute(
+            "SELECT unidade_pai_id FROM unidade WHERE id = ?", (atual,)
+        ).fetchone()
+        atual = linha[0] if linha else None
+    return False
 
 
 def tramitar_pelo_fluxo(banco: sqlite3.Connection, processo_id: int,

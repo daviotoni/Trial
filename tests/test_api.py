@@ -309,6 +309,31 @@ class TestAPI(unittest.TestCase):
             token=sa["token"])
         self.assertEqual(codigo, 200)
 
+    def test_caixa_do_setor(self):
+        _, unidades = requisitar(self.base, "GET", "/unidades")
+        gab = next(u for u in unidades
+                   if u["nome"].startswith("Gabinete do(a)"))
+        requisitar(self.base, "POST", "/usuarios", {
+            "login": "gab.caixa", "senha": "senha123", "perfil": "LEGISLATIVO",
+            "unidade_id": gab["id"]})
+        # Admin autua um PL com origem no gabinete e vincula o rito.
+        _, proc = requisitar(self.base, "POST", "/processos", {
+            "tipo": "LEGISLATIVO", "assunto": "PL na caixa",
+            "unidade_origem_id": gab["id"], "data_autuacao": "2025-09-10"})
+        requisitar(self.base, "POST", f"/processos/{proc['id']}/tipo",
+                   {"tipo": "PL"})
+        # O gabinete vê o processo na sua caixa, com a próxima etapa.
+        _, s = requisitar(self.base, "POST", "/login",
+                          {"login": "gab.caixa", "senha": "senha123"},
+                          token=False)
+        codigo, caixa = requisitar(self.base, "GET", "/caixa", token=s["token"])
+        self.assertEqual(codigo, 200)
+        assuntos = {p["assunto"] for p in caixa}
+        self.assertIn("PL na caixa", assuntos)
+        item = next(p for p in caixa if p["assunto"] == "PL na caixa")
+        self.assertEqual(item["proxima_unidade"],
+                         "Coordenadoria da Secretaria-Geral")
+
     def test_escrita_sem_login_retorna_401(self):
         codigo, erro = requisitar(self.base, "POST", "/processos", {
             "tipo": "ADMINISTRATIVO", "assunto": "X",

@@ -62,6 +62,26 @@ class TestFluxo(unittest.TestCase):
         # Está no gabinete (etapa 1); a próxima é o protocolo (etapa 2).
         self.assertEqual(prox["unidade"], "Coordenadoria da Secretaria-Geral")
 
+    def test_proxima_etapa_reconhece_gabinete_especifico(self):
+        # Processo num gabinete específico (filho de "Gabinetes de
+        # Vereadores", que é a etapa 1) deve seguir para a etapa 2.
+        gab = self.banco.execute(
+            "SELECT id FROM unidade WHERE nome LIKE 'Gabinete do(a)%' LIMIT 1"
+        ).fetchone()[0]
+        pid, _ = servicos.autuar_processo(
+            self.banco, "LEGISLATIVO", "PL de gabinete", gab, "2025-09-10")
+        fluxo.vincular_tipo(self.banco, pid, "PL")
+        prox = fluxo.proxima_etapa(self.banco, pid)
+        self.assertEqual(prox["unidade"], "Coordenadoria da Secretaria-Geral")
+
+    def test_gabinete_tem_competencia(self):
+        gab = self.banco.execute(
+            "SELECT id FROM unidade WHERE nome LIKE 'Gabinete do(a)%' LIMIT 1"
+        ).fetchone()[0]
+        comps = fluxo.competencias_da_unidade(self.banco, gab)
+        self.assertTrue(comps)
+        self.assertIn("mandato", comps[0]["descricao"].lower())
+
     def test_processo_sem_rito_nao_tem_proxima(self):
         origem = self._uid("Diretoria-Geral")
         pid, _ = servicos.autuar_processo(
