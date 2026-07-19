@@ -64,6 +64,8 @@ sistema/
   legislativo.py  # proposições, sessões, pauta e votações
   comissoes.py    # relatoria e pareceres de comissão (art. 33 do Regimento)
   fluxo.py        # competências legais + ritos configuráveis por tipo de processo
+  web/index.html         # interface do sistema (consome a API)
+  web/app-standalone.html # versão navegável offline (um arquivo, sem servidor)
 docs/
   pesquisa-estrutura-cmdc.md      # relatório de pesquisa com fontes verificadas
   modelo-de-dados.md              # desenho do banco: módulos, entidades, regras

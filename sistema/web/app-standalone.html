@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema CMDC — App navegável (offline)</title>
+</head>
+<body>
+<style>
+:root{--azul:#1a3a5c;--accent:#2c5f8a;--fundo:#eef2f6;--card:#fff;--borda:#d8dee4;
+  --texto:#24313d;--muted:#5a6b7b;--ok:#1e7d43;--okbg:#e6f4ea;--alerta:#b45309;
+  --alertabg:#fdf0dd;--erro:#b02a2a;--errobg:#fbeaea;--chip:#e4ecf3;--hero:#173251}
+@media (prefers-color-scheme:dark){:root{--azul:#0f2237;--accent:#5a9bcf;--fundo:#0d141c;
+  --card:#151f2b;--borda:#26323f;--texto:#e6edf3;--muted:#93a4b5;--ok:#4ade80;--okbg:#123123;
+  --alerta:#fbbf24;--alertabg:#3a2c10;--erro:#f87171;--errobg:#3a1a1a;--chip:#1e2c3b;--hero:#0c1c2e}}
+:root[data-theme="light"]{--azul:#1a3a5c;--accent:#2c5f8a;--fundo:#eef2f6;--card:#fff;--borda:#d8dee4;
+  --texto:#24313d;--muted:#5a6b7b;--ok:#1e7d43;--okbg:#e6f4ea;--alerta:#b45309;--alertabg:#fdf0dd;
+  --erro:#b02a2a;--errobg:#fbeaea;--chip:#e4ecf3;--hero:#173251}
+:root[data-theme="dark"]{--azul:#0f2237;--accent:#5a9bcf;--fundo:#0d141c;--card:#151f2b;--borda:#26323f;
+  --texto:#e6edf3;--muted:#93a4b5;--ok:#4ade80;--okbg:#123123;--alerta:#fbbf24;--alertabg:#3a2c10;
+  --erro:#f87171;--errobg:#3a1a1a;--chip:#1e2c3b;--hero:#0c1c2e}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--fundo);color:var(--texto)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header{background:var(--hero);color:#fff;padding:16px 0}
+header h1{margin:0;font-size:19px;font-weight:650}
+header .sub{opacity:.72;font-size:12.5px;margin-top:2px}
+.tag{display:inline-block;background:rgba(255,255,255,.14);font-size:11px;letter-spacing:.5px;
+  text-transform:uppercase;padding:3px 9px;border-radius:20px;margin-top:9px}
+.switch{background:var(--card);border-bottom:1px solid var(--borda);padding:11px 0}
+.switch .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.switch label{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+select,input,textarea{padding:8px 10px;border:1px solid var(--borda);border-radius:7px;font:inherit;
+  background:var(--card);color:var(--texto)}
+select#atuar{min-width:320px;font-size:14px}
+nav{background:var(--azul);position:sticky;top:0;z-index:5}
+nav .wrap{display:flex;gap:2px;flex-wrap:wrap}
+nav button{background:none;border:none;color:#fff;padding:11px 13px;cursor:pointer;font-size:13.5px;
+  border-bottom:3px solid transparent;opacity:.85}
+nav button:hover{opacity:1}nav button.on{border-bottom-color:#fff;font-weight:600;opacity:1}
+main{padding:20px 0 48px}section{display:none}section.on{display:block}
+.cartao{background:var(--card);border:1px solid var(--borda);border-radius:10px;padding:16px 18px;margin-bottom:15px}
+h2{margin:0 0 4px;font-size:16px;color:var(--accent)}h2 .s{color:var(--muted);font-weight:400;font-size:13.5px}
+.hint{color:var(--muted);font-size:13px;margin:2px 0 13px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--borda);vertical-align:top}
+th{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+tbody tr:last-child td{border-bottom:none}
+.grid{display:flex;gap:12px;flex-wrap:wrap}
+.ind{flex:1;min-width:120px;background:var(--chip);border-radius:9px;padding:12px;text-align:center}
+.ind .v{font-size:24px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.ind .n{font-size:11.5px;color:var(--muted)}
+ul.arv,ul.arv ul{list-style:none;padding-left:18px;margin:3px 0}ul.arv{padding-left:0}
+.no{cursor:pointer;padding:2px 6px;border-radius:5px;display:inline-block}.no:hover{background:var(--chip)}
+.grau{font-size:10.5px;background:var(--chip);color:var(--accent);border-radius:10px;padding:1px 8px;margin-left:6px}
+.passos{display:flex;flex-wrap:wrap;gap:6px}.rito{margin-bottom:16px}.rito h3{margin:0 0 7px;font-size:14px}
+.passo{background:var(--chip);border:1px solid var(--borda);border-radius:8px;padding:7px 10px;min-width:140px;flex:1}
+.passo.aqui{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.passo .o{font-size:11px;color:var(--muted)}.passo .u{font-weight:600;font-size:12.5px;margin:1px 0}.passo .a{font-size:11.5px;color:var(--muted)}
+.seta{align-self:center;color:var(--muted)}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin:4px 0}
+.chip{background:var(--chip);border-radius:20px;padding:4px 12px;font-size:12.5px}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.no{background:var(--errobg);color:var(--erro);text-decoration:line-through}
+.local{font-weight:600}.badge{font-size:11.5px;border-radius:20px;padding:2px 10px;background:var(--chip);color:var(--accent);white-space:nowrap}
+.acao{background:var(--accent);color:#fff;border:none;padding:8px 15px;border-radius:7px;cursor:pointer;font:inherit;font-size:13px}
+.acao:hover{filter:brightness(1.08)}.acao.sec{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.info{background:var(--chip);border-radius:8px;padding:12px 14px;font-size:13.5px;color:var(--muted)}
+.aviso{background:var(--alertabg);color:var(--alerta);border-radius:8px;padding:10px 13px;font-size:13px;margin-top:8px}
+.form{display:flex;flex-direction:column;gap:9px;max-width:520px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ok);color:#fff;
+  padding:10px 18px;border-radius:8px;font-size:13.5px;opacity:0;transition:.3s;pointer-events:none;z-index:20}
+.toast.show{opacity:1}
+ul.comp{margin:6px 0 0;padding-left:18px}ul.comp li{margin:4px 0}
+footer{border-top:1px solid var(--borda);color:var(--muted);font-size:12px;padding:16px 0;text-align:center}
+.linkbtn{background:none;border:none;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
+</style>
+
+<header><div class="wrap">
+  <h1>Sistema de Gestão — Câmara Municipal de Duque de Caxias</h1>
+  <div class="sub">Lei nº 3.525/2025 · fluxo processual integrado e acesso por setor</div>
+  <span class="tag">Versão navegável · dados salvos no seu navegador</span>
+</div></header>
+
+<div class="switch"><div class="wrap row">
+  <label for="atuar">Atuar como setor:</label>
+  <select id="atuar"></select>
+  <button class="acao sec" id="reset">Reiniciar dados</button>
+</div></div>
+
+<nav><div class="wrap" id="menu"></div></nav>
+
+<main class="wrap">
+  <section id="painel"><div class="cartao"><h2>Painel de gestão</h2>
+    <div class="hint">Visão geral pública (transparência — LAI).</div>
+    <div class="grid" id="ind"></div></div></section>
+
+  <section id="organograma"><div class="cartao"><h2>Estrutura organizacional (Lei nº 3.525/2025)</h2>
+    <div class="hint">Clique para expandir. 49 unidades da estrutura + 29 gabinetes.</div>
+    <div id="arv"></div></div></section>
+
+  <section id="fluxos"><div class="cartao"><h2>Fluxos processuais (ritos por tipo)</h2>
+    <div class="hint">O caminho de cada tipo de processo entre os setores.</div>
+    <div id="ritos"></div></div></section>
+
+  <section id="novo"><div class="cartao"><h2>Nova proposição / processo <span class="s" id="novo-setor"></span></h2>
+    <div id="novo-corpo"></div></div></section>
+
+  <section id="caixa"><div class="cartao"><h2>Minha caixa <span class="s" id="cx-setor"></span></h2>
+    <div class="hint">Processos que estão <b>agora</b> no seu setor. Encaminhe ao próximo.</div>
+    <div id="cx"></div></div></section>
+
+  <section id="prop"><div class="cartao"><h2>Minhas proposições <span class="s" id="pr-setor"></span></h2>
+    <div class="hint">Tudo o que o seu setor iniciou — e onde está agora.</div>
+    <div id="pr"></div></div></section>
+
+  <section id="setor"><div class="cartao"><h2>Meu setor <span class="s" id="ms-setor"></span></h2>
+    <div id="ms"></div></div></section>
+</main>
+
+<div class="toast" id="toast"></div>
+<footer class="wrap">Protótipo de estudo · dados fictícios · salvos localmente no seu navegador (nada é enviado a servidor).</footer>
+
+<script>
+const D = {"unidades": [{"id": 1, "nome": "Mesa Diretora", "pai_id": null, "grau": null, "tipo": "POLITICO"}, {"id": 2, "nome": "Presidência", "pai_id": 1, "grau": null, "tipo": "POLITICO"}, {"id": 3, "nome": "Gabinetes de Vereadores", "pai_id": 1, "grau": null, "tipo": "POLITICO"}, {"id": 4, "nome": "Comissão Permanente de Licitação", "pai_id": 1, "grau": null, "tipo": "COMISSAO"}, {"id": 5, "nome": "Comissão Permanente de Recebimento Definitivo de Obras, Serviços e Bens", "pai_id": 1, "grau": null, "tipo": "COMISSAO"}, {"id": 6, "nome": "Comissão Permanente de Aplicação de Sanções", "pai_id": 1, "grau": null, "tipo": "COMISSAO"}, {"id": 7, "nome": "Comissão Permanente de Proteção de Dados Pessoais", "pai_id": 1, "grau": null, "tipo": "COMISSAO"}, {"id": 8, "nome": "Comissão Permanente de Atualização e Consolidação de Leis e Normas Municipais", "pai_id": 1, "grau": null, "tipo": "COMISSAO"}, {"id": 9, "nome": "Consultoria-Geral Legislativa", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 10, "nome": "Controladoria-Geral", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 11, "nome": "Diretoria da Escola do Legislativo", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 12, "nome": "Diretoria de Plenário", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 13, "nome": "Ouvidoria-Geral", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 14, "nome": "Procuradoria-Geral", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 15, "nome": "Superintendência-Geral", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 16, "nome": "Superintendência de Assuntos Estratégicos", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 17, "nome": "Diretoria-Geral", "pai_id": 2, "grau": 1, "tipo": "SUPERIOR"}, {"id": 18, "nome": "Assessoria de Gabinete Parlamentar", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 19, "nome": "Assessoria Especial da Presidência", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 20, "nome": "Assessores Parlamentares", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 21, "nome": "Assistência às Comissões Permanentes", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 22, "nome": "Coordenadoria de Apoio Legislativo", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 23, "nome": "Coordenadoria de Assuntos de Plenário", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 24, "nome": "Coordenadoria de Atas e Projetos", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 25, "nome": "Coordenadoria de Avaliação e Acompanhamento de Compras", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 26, "nome": "Coordenadoria de Cerimonial e Comunicação Social", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 27, "nome": "Coordenadoria de Contabilidade", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 28, "nome": "Coordenadoria de Documentação Histórica", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 29, "nome": "Coordenadoria de Finanças", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 30, "nome": "Coordenadoria de Licitações e Contratos", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 31, "nome": "Coordenadoria de Manutenção", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 32, "nome": "Coordenadoria de Material", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 33, "nome": "Coordenadoria de Patrimônio", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 34, "nome": "Coordenadoria de Polícia Legislativa", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 35, "nome": "Coordenadoria de Prevenção a Incêndio", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 36, "nome": "Coordenadoria de Publicações e Transparência", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 37, "nome": "Coordenadoria de Redação Oficial e Legislativa", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 38, "nome": "Coordenadoria de Recursos Humanos", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 39, "nome": "Coordenadoria de Tecnologia da Informação e Comunicação", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 40, "nome": "Coordenadoria da Secretaria-Geral", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 41, "nome": "Diretoria Administrativa", "pai_id": 17, "grau": 2, "tipo": "COORDENADORIA"}, {"id": 42, "nome": "Departamento do e-Social", "pai_id": 41, "grau": 4, "tipo": "AUXILIAR"}, {"id": 43, "nome": "Serviços de Copa", "pai_id": 41, "grau": 4, "tipo": "AUXILIAR"}, {"id": 44, "nome": "Manutenção Predial", "pai_id": 41, "grau": 4, "tipo": "AUXILIAR"}, {"id": 45, "nome": "Telefonia", "pai_id": 41, "grau": 4, "tipo": "AUXILIAR"}, {"id": 46, "nome": "Reprografia", "pai_id": 41, "grau": 4, "tipo": "AUXILIAR"}, {"id": 47, "nome": "Limpeza", "pai_id": 41, "grau": 4, "tipo": "AUXILIAR"}, {"id": 48, "nome": "Transporte", "pai_id": 41, "grau": 4, "tipo": "AUXILIAR"}, {"id": 49, "nome": "Vigilância Patrimonial", "pai_id": 41, "grau": 4, "tipo": "AUXILIAR"}, {"id": 50, "nome": "Gabinete do(a) Vereador(a) Chiquinho Caipira", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 51, "nome": "Gabinete do(a) Vereador(a) Alex Freitas", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 52, "nome": "Gabinete do(a) Vereador(a) Andréia Zito", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 53, "nome": "Gabinete do(a) Vereador(a) Junior Uios", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 54, "nome": "Gabinete do(a) Vereador(a) Carlinhos da Barreira", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 55, "nome": "Gabinete do(a) Vereador(a) Claudio Thomaz", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 56, "nome": "Gabinete do(a) Vereador(a) Clovinho Sempre Junto", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 57, "nome": "Gabinete do(a) Vereador(a) Delza de Oliveira", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 58, "nome": "Gabinete do(a) Vereador(a) Junior Reis", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 59, "nome": "Gabinete do(a) Vereador(a) Anderson Lopes", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 60, "nome": "Gabinete do(a) Vereador(a) Eduardo Moreira", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 61, "nome": "Gabinete do(a) Vereador(a) Fernanda Costa", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 62, "nome": "Gabinete do(a) Vereador(a) Giorgio Monteiro", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 63, "nome": "Gabinete do(a) Vereador(a) Juliana do Taxi", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 64, "nome": "Gabinete do(a) Vereador(a) Leandro Enfermeiro", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 65, "nome": "Gabinete do(a) Vereador(a) Catiti", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 66, "nome": "Gabinete do(a) Vereador(a) Marquinho Oi", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 67, "nome": "Gabinete do(a) Vereador(a) Marquinho Dentista", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 68, "nome": "Gabinete do(a) Vereador(a) Marquinho da Pipa", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 69, "nome": "Gabinete do(a) Vereador(a) Dr. Maurício", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 70, "nome": "Gabinete do(a) Vereador(a) Michel Reis", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 71, "nome": "Gabinete do(a) Vereador(a) Michele Tavares", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 72, "nome": "Gabinete do(a) Vereador(a) Moises Neguinho", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 73, "nome": "Gabinete do(a) Vereador(a) Beto Gabriel", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 74, "nome": "Gabinete do(a) Vereador(a) Saulo Henrique", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 75, "nome": "Gabinete do(a) Vereador(a) Serginho Corrêa", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 76, "nome": "Gabinete do(a) Vereador(a) Valdecy Nunes", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 77, "nome": "Gabinete do(a) Vereador(a) Vitinho Grandão", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}, {"id": 78, "nome": "Gabinete do(a) Vereador(a) Wendell Oliveira", "pai_id": 3, "grau": 3, "tipo": "ASSESSORAMENTO"}], "areas": {"2": ["LEGISLATIVO"], "1": ["LEGISLATIVO"], "14": ["JURIDICO"], "9": ["JURIDICO"], "40": ["PROTOCOLO"], "38": ["PESSOAL", "FOLHA"], "42": ["FOLHA"], "27": ["FOLHA"], "29": ["FOLHA"], "4": ["COMPRAS"], "30": ["COMPRAS"], "32": ["COMPRAS"], "25": ["COMPRAS"], "10": ["CONTROLE", "FOLHA"], "36": ["TRANSPARENCIA", "CONTROLE"], "12": ["LEGISLATIVO"], "22": ["LEGISLATIVO"], "23": ["LEGISLATIVO"], "24": ["LEGISLATIVO"], "21": ["LEGISLATIVO"], "39": ["USUARIOS"], "17": ["ADMINISTRACAO"], "15": ["ADMINISTRACAO"], "16": ["PLANEJAMENTO"], "11": ["CAPACITACAO"], "13": ["OUVIDORIA"], "26": ["COMUNICACAO"], "28": ["DOCUMENTACAO"], "31": ["SERVICOS"], "33": ["PATRIMONIO"], "34": ["SEGURANCA"], "35": ["SEGURANCA"], "37": ["LEGISLATIVO"], "41": ["ADMINISTRACAO"], "20": ["LEGISLATIVO"], "19": ["ADMINISTRACAO"], "18": ["LEGISLATIVO"], "6": ["COMPRAS"], "8": ["JURIDICO"], "7": ["JURIDICO"], "5": ["COMPRAS"], "50": ["LEGISLATIVO"], "51": ["LEGISLATIVO"], "52": ["LEGISLATIVO"], "53": ["LEGISLATIVO"], "54": ["LEGISLATIVO"], "55": ["LEGISLATIVO"], "56": ["LEGISLATIVO"], "57": ["LEGISLATIVO"], "58": ["LEGISLATIVO"], "59": ["LEGISLATIVO"], "60": ["LEGISLATIVO"], "61": ["LEGISLATIVO"], "62": ["LEGISLATIVO"], "63": ["LEGISLATIVO"], "64": ["LEGISLATIVO"], "65": ["LEGISLATIVO"], "66": ["LEGISLATIVO"], "67": ["LEGISLATIVO"], "68": ["LEGISLATIVO"], "69": ["LEGISLATIVO"], "70": ["LEGISLATIVO"], "71": ["LEGISLATIVO"], "72": ["LEGISLATIVO"], "73": ["LEGISLATIVO"], "74": ["LEGISLATIVO"], "75": ["LEGISLATIVO"], "76": ["LEGISLATIVO"], "77": ["LEGISLATIVO"], "78": ["LEGISLATIVO"]}, "acoes": {"2": ["CONVOCAR_SESSAO", "PAUTAR", "DISTRIBUIR_RELATORIA"], "1": ["CONVOCAR_SESSAO", "APRESENTAR_PROPOSICAO", "DISTRIBUIR_RELATORIA"], "12": ["PAUTAR"], "50": ["APRESENTAR_PROPOSICAO"], "51": ["APRESENTAR_PROPOSICAO"], "52": ["APRESENTAR_PROPOSICAO"], "53": ["APRESENTAR_PROPOSICAO"], "54": ["APRESENTAR_PROPOSICAO"], "55": ["APRESENTAR_PROPOSICAO"], "56": ["APRESENTAR_PROPOSICAO"], "57": ["APRESENTAR_PROPOSICAO"], "58": ["APRESENTAR_PROPOSICAO"], "59": ["APRESENTAR_PROPOSICAO"], "60": ["APRESENTAR_PROPOSICAO"], "61": ["APRESENTAR_PROPOSICAO"], "62": ["APRESENTAR_PROPOSICAO"], "63": ["APRESENTAR_PROPOSICAO"], "64": ["APRESENTAR_PROPOSICAO"], "65": ["APRESENTAR_PROPOSICAO"], "66": ["APRESENTAR_PROPOSICAO"], "67": ["APRESENTAR_PROPOSICAO"], "68": ["APRESENTAR_PROPOSICAO"], "69": ["APRESENTAR_PROPOSICAO"], "70": ["APRESENTAR_PROPOSICAO"], "71": ["APRESENTAR_PROPOSICAO"], "72": ["APRESENTAR_PROPOSICAO"], "73": ["APRESENTAR_PROPOSICAO"], "74": ["APRESENTAR_PROPOSICAO"], "75": ["APRESENTAR_PROPOSICAO"], "76": ["APRESENTAR_PROPOSICAO"], "77": ["APRESENTAR_PROPOSICAO"], "78": ["APRESENTAR_PROPOSICAO"]}, "competencias": {"1": ["Comando político-institucional da Casa; não integra a hierarquia técnico-administrativa (art. 2º, parágrafo único)"], "2": ["Dirigir os trabalhos legislativos e administrativos"], "4": ["Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)"], "5": ["Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)"], "6": ["Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)"], "7": ["Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)"], "8": ["Órgão colegiado de apoio à administração; membros com gratificação de 40% (art. 46, §2º)"], "9": ["Consultoria e assessoramento técnico-legislativo (art. 11)"], "10": ["Controle interno, auditoria e fiscalização (art. 12)"], "11": ["Formação e capacitação legislativa (art. 13)"], "12": ["Organização dos trabalhos e da ordem do dia do Plenário (art. 14)"], "13": ["Ouvidoria: recebimento e encaminhamento de demandas (art. 18)"], "14": ["Representação e consultoria jurídica da Câmara (art. 19)"], "15": ["Superintendência dos serviços administrativos (art. 16)"], "16": ["Planejamento e assuntos estratégicos (art. 17)"], "17": ["Órgão central de apoio administrativo, diretamente subordinado à Presidência; supervisiona telefonia e transporte (art. 15)"], "18": ["Assessoramento parlamentar (3º grau); provimento por indicação dos titulares (art. 3º, §2º)"], "19": ["Assessoramento parlamentar (3º grau); provimento por indicação dos titulares (art. 3º, §2º)"], "20": ["Assessoramento parlamentar (3º grau); provimento por indicação dos titulares (art. 3º, §2º)"], "21": ["Assessoramento parlamentar (3º grau); provimento por indicação dos titulares (art. 3º, §2º)"], "22": ["Apoio ao processo legislativo e às sessões plenárias (art. 20)"], "23": ["Suporte à ordem do dia e aos trabalhos de Plenário (art. 21)"], "24": ["Elaboração de atas das sessões e autuação de projetos e proposições (art. 22)"], "25": ["Fiscalização e acompanhamento das aquisições e contratações (art. 23)"], "26": ["Cerimonial, comunicação institucional e imprensa (art. 24)"], "27": ["Escrituração contábil, empenho e execução orçamentária (art. 25)"], "28": ["Guarda e preservação do acervo documental e histórico (art. 26)"], "29": ["Gestão financeira, pagamentos e conciliação (art. 27)"], "30": ["Formalização e gestão de licitações e contratos, Lei 14.133/2021 (art. 28)"], "31": ["Manutenção predial e das instalações; serviços de copa, limpeza e reprografia (art. 29)"], "32": ["Gestão de material e almoxarifado; termo de referência e pesquisa de preços (art. 30)"], "33": ["Registro, controle e baixa dos bens patrimoniais (art. 31)"], "34": ["Segurança institucional, poder de polícia e fiscalização da vigilância (art. 32)"], "35": ["Prevenção e combate a incêndio e segurança predial (art. 33)"], "36": ["Publicação oficial dos atos e transparência ativa, LAI (art. 34)"], "37": ["Redação final de autógrafos, leis e atos normativos (art. 35)"], "38": ["Gestão de pessoal: cadastro, provimento, lotação e vida funcional dos servidores (art. 36)"], "39": ["Gestão dos sistemas e da infraestrutura de tecnologia da informação (art. 38)"], "40": ["Protocolo-geral, autuação, numeração e tramitação de processos administrativos e legislativos (art. 37)"], "41": ["Coordenação dos serviços administrativos e auxiliares (art. 39)"], "42": ["Gestão, consolidação e envio das informações trabalhistas, previdenciárias e fiscais ao e-Social (art. 48)"], "43": ["Serviços de copa e apoio, geridos pela Coordenadoria de Manutenção (art. 29, V)"], "44": ["Manutenção predial e das instalações (art. 29)"], "45": ["Serviços de telefonia, sob supervisão da Diretoria-Geral (art. 15, VIII)"], "46": ["Reprografia; manutenção dos equipamentos pela Coordenadoria de Manutenção (art. 29, VIII)"], "47": ["Serviços de limpeza, coordenados pela Coordenadoria de Manutenção (art. 29, I, X e XI)"], "48": ["Serviços de transporte, sob supervisão do Diretor Administrativo (art. 78, III)"], "49": ["Vigilância e segurança patrimonial, fiscalizada pela Polícia Legislativa (art. 32, II)"], "50": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "51": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "52": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "53": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "54": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "55": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "56": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "57": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "58": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "59": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "60": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "61": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "62": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "63": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "64": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "65": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "66": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "67": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "68": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "69": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "70": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "71": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "72": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "73": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "74": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "75": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "76": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "77": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"], "78": ["Assessoramento político-legislativo ao titular do mandato; autoria e apresentação de proposições (art. 1º, p.u., e art. 79)"]}, "ritos": {"PL": {"nome": "Projeto de Lei", "dominio": "LEGISLATIVO", "etapas": [{"ordem": 1, "unidade_id": 3, "unidade": "Gabinetes de Vereadores", "acao": "Autoria e apresentação da proposição", "prazo_dias": 0}, {"ordem": 2, "unidade_id": 40, "unidade": "Coordenadoria da Secretaria-Geral", "acao": "Protocolo, autuação e numeração", "prazo_dias": 2}, {"ordem": 3, "unidade_id": 9, "unidade": "Consultoria-Geral Legislativa", "acao": "Análise de constitucionalidade e técnica legislativa", "prazo_dias": 10}, {"ordem": 4, "unidade_id": 21, "unidade": "Assistência às Comissões Permanentes", "acao": "Distribuição às comissões e coleta de pareceres", "prazo_dias": 15}, {"ordem": 5, "unidade_id": 12, "unidade": "Diretoria de Plenário", "acao": "Inclusão em Ordem do Dia e deliberação", "prazo_dias": 5}, {"ordem": 6, "unidade_id": 37, "unidade": "Coordenadoria de Redação Oficial e Legislativa", "acao": "Redação final do autógrafo", "prazo_dias": 3}, {"ordem": 7, "unidade_id": 2, "unidade": "Presidência", "acao": "Promulgação ou encaminhamento à sanção", "prazo_dias": 5}]}, "COMPRA": {"nome": "Contratação (Lei 14.133/2021)", "dominio": "ADMINISTRATIVO", "etapas": [{"ordem": 1, "unidade_id": 40, "unidade": "Coordenadoria da Secretaria-Geral", "acao": "Protocolo e autuação do pedido", "prazo_dias": 2}, {"ordem": 2, "unidade_id": 17, "unidade": "Diretoria-Geral", "acao": "Autorização da despesa", "prazo_dias": 3}, {"ordem": 3, "unidade_id": 32, "unidade": "Coordenadoria de Material", "acao": "Termo de referência e pesquisa de preços", "prazo_dias": 10}, {"ordem": 4, "unidade_id": 14, "unidade": "Procuradoria-Geral", "acao": "Parecer jurídico prévio", "prazo_dias": 7}, {"ordem": 5, "unidade_id": 4, "unidade": "Comissão Permanente de Licitação", "acao": "Condução do certame licitatório", "prazo_dias": 30}, {"ordem": 6, "unidade_id": 30, "unidade": "Coordenadoria de Licitações e Contratos", "acao": "Homologação e formalização do contrato", "prazo_dias": 5}, {"ordem": 7, "unidade_id": 27, "unidade": "Coordenadoria de Contabilidade", "acao": "Empenho da despesa", "prazo_dias": 3}, {"ordem": 8, "unidade_id": 36, "unidade": "Coordenadoria de Publicações e Transparência", "acao": "Publicação do extrato", "prazo_dias": 2}]}}, "organograma": {"nome": "Mesa Diretora", "grau": null, "sub": [{"nome": "Presidência", "grau": null, "sub": [{"nome": "Consultoria-Geral Legislativa", "grau": 1, "sub": []}, {"nome": "Controladoria-Geral", "grau": 1, "sub": []}, {"nome": "Diretoria da Escola do Legislativo", "grau": 1, "sub": []}, {"nome": "Diretoria de Plenário", "grau": 1, "sub": []}, {"nome": "Ouvidoria-Geral", "grau": 1, "sub": []}, {"nome": "Procuradoria-Geral", "grau": 1, "sub": []}, {"nome": "Superintendência-Geral", "grau": 1, "sub": []}, {"nome": "Superintendência de Assuntos Estratégicos", "grau": 1, "sub": []}, {"nome": "Diretoria-Geral", "grau": 1, "sub": [{"nome": "Coordenadoria de Apoio Legislativo", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Assuntos de Plenário", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Atas e Projetos", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Avaliação e Acompanhamento de Compras", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Cerimonial e Comunicação Social", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Contabilidade", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Documentação Histórica", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Finanças", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Licitações e Contratos", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Manutenção", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Material", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Patrimônio", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Polícia Legislativa", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Prevenção a Incêndio", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Publicações e Transparência", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Redação Oficial e Legislativa", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Recursos Humanos", "grau": 2, "sub": []}, {"nome": "Coordenadoria de Tecnologia da Informação e Comunicação", "grau": 2, "sub": []}, {"nome": "Coordenadoria da Secretaria-Geral", "grau": 2, "sub": []}, {"nome": "Diretoria Administrativa", "grau": 2, "sub": [{"nome": "Departamento do e-Social", "grau": 4, "sub": []}, {"nome": "Serviços de Copa", "grau": 4, "sub": []}, {"nome": "Manutenção Predial", "grau": 4, "sub": []}, {"nome": "Telefonia", "grau": 4, "sub": []}, {"nome": "Reprografia", "grau": 4, "sub": []}, {"nome": "Limpeza", "grau": 4, "sub": []}, {"nome": "Transporte", "grau": 4, "sub": []}, {"nome": "Vigilância Patrimonial", "grau": 4, "sub": []}]}]}]}, {"nome": "Gabinetes de Vereadores", "grau": null, "sub": [{"nome": "Assessoria de Gabinete Parlamentar", "grau": 3, "sub": []}, {"nome": "Assessoria Especial da Presidência", "grau": 3, "sub": []}, {"nome": "Assessores Parlamentares", "grau": 3, "sub": []}, {"nome": "Assistência às Comissões Permanentes", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Chiquinho Caipira", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Alex Freitas", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Andréia Zito", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Junior Uios", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Carlinhos da Barreira", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Claudio Thomaz", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Clovinho Sempre Junto", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Delza de Oliveira", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Junior Reis", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Anderson Lopes", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Eduardo Moreira", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Fernanda Costa", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Giorgio Monteiro", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Juliana do Taxi", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Leandro Enfermeiro", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Catiti", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Marquinho Oi", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Marquinho Dentista", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Marquinho da Pipa", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Dr. Maurício", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Michel Reis", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Michele Tavares", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Moises Neguinho", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Beto Gabriel", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Saulo Henrique", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Serginho Corrêa", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Valdecy Nunes", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Vitinho Grandão", "grau": 3, "sub": []}, {"nome": "Gabinete do(a) Vereador(a) Wendell Oliveira", "grau": 3, "sub": []}]}, {"nome": "Comissão Permanente de Licitação", "grau": null, "sub": []}, {"nome": "Comissão Permanente de Recebimento Definitivo de Obras, Serviços e Bens", "grau": null, "sub": []}, {"nome": "Comissão Permanente de Aplicação de Sanções", "grau": null, "sub": []}, {"nome": "Comissão Permanente de Proteção de Dados Pessoais", "grau": null, "sub": []}, {"nome": "Comissão Permanente de Atualização e Consolidação de Leis e Normas Municipais", "grau": null, "sub": []}]}, "login_sectors": [{"id": 6, "nome": "Comissão Permanente de Aplicação de Sanções", "grau": null}, {"id": 8, "nome": "Comissão Permanente de Atualização e Consolidação de Leis e Normas Municipais", "grau": null}, {"id": 4, "nome": "Comissão Permanente de Licitação", "grau": null}, {"id": 7, "nome": "Comissão Permanente de Proteção de Dados Pessoais", "grau": null}, {"id": 5, "nome": "Comissão Permanente de Recebimento Definitivo de Obras, Serviços e Bens", "grau": null}, {"id": 1, "nome": "Mesa Diretora", "grau": null}, {"id": 2, "nome": "Presidência", "grau": null}, {"id": 9, "nome": "Consultoria-Geral Legislativa", "grau": 1}, {"id": 10, "nome": "Controladoria-Geral", "grau": 1}, {"id": 11, "nome": "Diretoria da Escola do Legislativo", "grau": 1}, {"id": 12, "nome": "Diretoria de Plenário", "grau": 1}, {"id": 17, "nome": "Diretoria-Geral", "grau": 1}, {"id": 13, "nome": "Ouvidoria-Geral", "grau": 1}, {"id": 14, "nome": "Procuradoria-Geral", "grau": 1}, {"id": 16, "nome": "Superintendência de Assuntos Estratégicos", "grau": 1}, {"id": 15, "nome": "Superintendência-Geral", "grau": 1}, {"id": 40, "nome": "Coordenadoria da Secretaria-Geral", "grau": 2}, {"id": 22, "nome": "Coordenadoria de Apoio Legislativo", "grau": 2}, {"id": 23, "nome": "Coordenadoria de Assuntos de Plenário", "grau": 2}, {"id": 24, "nome": "Coordenadoria de Atas e Projetos", "grau": 2}, {"id": 25, "nome": "Coordenadoria de Avaliação e Acompanhamento de Compras", "grau": 2}, {"id": 26, "nome": "Coordenadoria de Cerimonial e Comunicação Social", "grau": 2}, {"id": 27, "nome": "Coordenadoria de Contabilidade", "grau": 2}, {"id": 28, "nome": "Coordenadoria de Documentação Histórica", "grau": 2}, {"id": 29, "nome": "Coordenadoria de Finanças", "grau": 2}, {"id": 30, "nome": "Coordenadoria de Licitações e Contratos", "grau": 2}, {"id": 31, "nome": "Coordenadoria de Manutenção", "grau": 2}, {"id": 32, "nome": "Coordenadoria de Material", "grau": 2}, {"id": 33, "nome": "Coordenadoria de Patrimônio", "grau": 2}, {"id": 34, "nome": "Coordenadoria de Polícia Legislativa", "grau": 2}, {"id": 35, "nome": "Coordenadoria de Prevenção a Incêndio", "grau": 2}, {"id": 36, "nome": "Coordenadoria de Publicações e Transparência", "grau": 2}, {"id": 38, "nome": "Coordenadoria de Recursos Humanos", "grau": 2}, {"id": 37, "nome": "Coordenadoria de Redação Oficial e Legislativa", "grau": 2}, {"id": 39, "nome": "Coordenadoria de Tecnologia da Informação e Comunicação", "grau": 2}, {"id": 41, "nome": "Diretoria Administrativa", "grau": 2}, {"id": 20, "nome": "Assessores Parlamentares", "grau": 3}, {"id": 19, "nome": "Assessoria Especial da Presidência", "grau": 3}, {"id": 18, "nome": "Assessoria de Gabinete Parlamentar", "grau": 3}, {"id": 21, "nome": "Assistência às Comissões Permanentes", "grau": 3}, {"id": 51, "nome": "Gabinete do(a) Vereador(a) Alex Freitas", "grau": 3}, {"id": 59, "nome": "Gabinete do(a) Vereador(a) Anderson Lopes", "grau": 3}, {"id": 52, "nome": "Gabinete do(a) Vereador(a) Andréia Zito", "grau": 3}, {"id": 73, "nome": "Gabinete do(a) Vereador(a) Beto Gabriel", "grau": 3}, {"id": 54, "nome": "Gabinete do(a) Vereador(a) Carlinhos da Barreira", "grau": 3}, {"id": 65, "nome": "Gabinete do(a) Vereador(a) Catiti", "grau": 3}, {"id": 50, "nome": "Gabinete do(a) Vereador(a) Chiquinho Caipira", "grau": 3}, {"id": 55, "nome": "Gabinete do(a) Vereador(a) Claudio Thomaz", "grau": 3}, {"id": 56, "nome": "Gabinete do(a) Vereador(a) Clovinho Sempre Junto", "grau": 3}, {"id": 57, "nome": "Gabinete do(a) Vereador(a) Delza de Oliveira", "grau": 3}, {"id": 69, "nome": "Gabinete do(a) Vereador(a) Dr. Maurício", "grau": 3}, {"id": 60, "nome": "Gabinete do(a) Vereador(a) Eduardo Moreira", "grau": 3}, {"id": 61, "nome": "Gabinete do(a) Vereador(a) Fernanda Costa", "grau": 3}, {"id": 62, "nome": "Gabinete do(a) Vereador(a) Giorgio Monteiro", "grau": 3}, {"id": 63, "nome": "Gabinete do(a) Vereador(a) Juliana do Taxi", "grau": 3}, {"id": 58, "nome": "Gabinete do(a) Vereador(a) Junior Reis", "grau": 3}, {"id": 53, "nome": "Gabinete do(a) Vereador(a) Junior Uios", "grau": 3}, {"id": 64, "nome": "Gabinete do(a) Vereador(a) Leandro Enfermeiro", "grau": 3}, {"id": 67, "nome": "Gabinete do(a) Vereador(a) Marquinho Dentista", "grau": 3}, {"id": 66, "nome": "Gabinete do(a) Vereador(a) Marquinho Oi", "grau": 3}, {"id": 68, "nome": "Gabinete do(a) Vereador(a) Marquinho da Pipa", "grau": 3}, {"id": 70, "nome": "Gabinete do(a) Vereador(a) Michel Reis", "grau": 3}, {"id": 71, "nome": "Gabinete do(a) Vereador(a) Michele Tavares", "grau": 3}, {"id": 72, "nome": "Gabinete do(a) Vereador(a) Moises Neguinho", "grau": 3}, {"id": 74, "nome": "Gabinete do(a) Vereador(a) Saulo Henrique", "grau": 3}, {"id": 75, "nome": "Gabinete do(a) Vereador(a) Serginho Corrêa", "grau": 3}, {"id": 76, "nome": "Gabinete do(a) Vereador(a) Valdecy Nunes", "grau": 3}, {"id": 77, "nome": "Gabinete do(a) Vereador(a) Vitinho Grandão", "grau": 3}, {"id": 78, "nome": "Gabinete do(a) Vereador(a) Wendell Oliveira", "grau": 3}, {"id": 42, "nome": "Departamento do e-Social", "grau": 4}], "processos": [{"numero": 1, "ano": 2025, "tipo": "LEGISLATIVO", "assunto": "Institui a Semana Municipal da Leitura", "origem_id": 50, "rito": "PL", "local_id": 40}, {"numero": 2, "ano": 2025, "tipo": "LEGISLATIVO", "assunto": "Denomina logradouro público no Centro", "origem_id": 50, "rito": "PL", "local_id": 50}], "vagas": 615, "n_unidades": 78};
+const UNI = {}; D.unidades.forEach(u=>UNI[u.id]=u);
+const ACOES=[["APRESENTAR_PROPOSICAO","Apresentar proposição"],["CONVOCAR_SESSAO","Convocar sessão"],
+  ["PAUTAR","Incluir na Ordem do Dia"],["DISTRIBUIR_RELATORIA","Distribuir relatoria"]];
+const SIT={EM_TRAMITACAO:"Em tramitação",CONCLUIDO:"Concluído",ARQUIVADO:"Arquivado"};
+const TABS=[["painel","Painel","pub"],["organograma","Organograma","pub"],["fluxos","Fluxos","pub"],
+  ["novo","Nova proposição","login"],["caixa","Minha caixa","login"],["prop","Minhas proposições","login"],
+  ["setor","Meu setor","login"]];
+const KEY="cmdc_app_v1";
+let estado = carregar();
+let atuando = null; // unidade_id ou null (visitante) ou "ADMIN"
+let aba = "painel";
+
+function carregar(){
+  try{const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.processos) return s;}catch(e){}
+  return {processos: D.processos.map((p,i)=>({id:i+1,...p})), seq: D.processos.length};
+}
+function salvar(){localStorage.setItem(KEY,JSON.stringify(estado));}
+function toast(t){const e=document.getElementById("toast");e.textContent=t;e.classList.add("show");
+  setTimeout(()=>e.classList.remove("show"),2200);}
+
+function unidadeAtual(){return atuando && atuando!=="ADMIN" ? UNI[atuando] : null;}
+function areasDe(uid){return uid==="ADMIN" ? Object.keys(AREA_TODAS) : (D.areas[uid]||[]);}
+const AREA_TODAS={PESSOAL:1,FOLHA:1,PROTOCOLO:1,LEGISLATIVO:1,COMPRAS:1,TRANSPARENCIA:1,CONTROLE:1,JURIDICO:1,USUARIOS:1};
+function acoesDe(uid){return uid==="ADMIN" ? ["*"] : (D.acoes[uid]||[]);}
+function logado(){return atuando!==null;}
+
+// hierarquia: 'a' é a própria ancestral ou subordinada a ela?
+function subordinada(a, anc){let x=a,seen=new Set();
+  while(x!=null&&!seen.has(x)){if(x===anc)return true;seen.add(x);x=UNI[x]?UNI[x].pai_id:null;}return false;}
+function proxima(proc){
+  const et=D.ritos[proc.rito].etapas; const loc=proc.local_id;
+  let idx=et.findIndex(e=>e.unidade_id===loc);
+  if(idx<0)idx=et.map((e,i)=>[e,i]).filter(([e])=>subordinada(loc,e.unidade_id)).map(([,i])=>i).pop();
+  if(idx==null||idx<0)return et[0];
+  return idx+1<et.length?et[idx+1]:null;
+}
+
+function renderAtuar(){
+  const s=document.getElementById("atuar");s.innerHTML="";
+  const add=(v,t)=>{const o=document.createElement("option");o.value=v;o.textContent=t;s.appendChild(o);};
+  add("__vis","— Visitante (sem login) —");
+  add("ADMIN","Admin (Diretoria-Geral/TI) — vê tudo");
+  const grupos={1:"1º grau — Órgãos superiores",2:"2º grau — Coordenadorias",3:"3º grau — Assessoramento",4:"Serviços"};
+  const porGrau={};
+  D.login_sectors.forEach(u=>{const g=u.grau||2;(porGrau[g]=porGrau[g]||[]).push(u);});
+  Object.keys(grupos).forEach(g=>{
+    const arr=(porGrau[g]||[]).filter(u=>!u.nome.startsWith("Gabinete do(a)"));
+    if(!arr.length)return;
+    const og=document.createElement("optgroup");og.label=grupos[g];
+    arr.forEach(u=>{const o=document.createElement("option");o.value=u.id;o.textContent=u.nome;og.appendChild(o);});
+    s.appendChild(og);
+  });
+  const gabs=D.login_sectors.filter(u=>u.nome.startsWith("Gabinete do(a)"));
+  const og=document.createElement("optgroup");og.label="Gabinetes de Vereadores";
+  gabs.forEach(u=>{const o=document.createElement("option");o.value=u.id;o.textContent=u.nome.replace("Gabinete do(a) ","");og.appendChild(o);});
+  s.appendChild(og);
+  s.value = atuando===null?"__vis":atuando;
+  s.onchange=()=>{const v=s.value;atuando = v==="__vis"?null : v==="ADMIN"?"ADMIN":Number(v);render();};
+}
+function renderMenu(){
+  const m=document.getElementById("menu");m.innerHTML="";let vis=[];
+  TABS.forEach(([id,rot,gate])=>{
+    let ok = gate==="pub"?true : logado();
+    if(!ok)return;vis.push(id);
+    const b=document.createElement("button");b.textContent=rot;b.onclick=()=>{aba=id;pinta();};m.appendChild(b);
+  });
+  if(!vis.includes(aba))aba=logado()?"caixa":"painel";
+  pinta();
+}
+function pinta(){
+  document.querySelectorAll("#menu button").forEach(b=>b.classList.toggle("on",
+    b.textContent===(TABS.find(t=>t[0]===aba)||[])[1]));
+  document.querySelectorAll("main section").forEach(s=>s.classList.toggle("on",s.id===aba));
+  if(aba==="novo")renderNovo();if(aba==="caixa")renderCaixa();
+  if(aba==="prop")renderProp();if(aba==="setor")renderSetor();
+}
+function renderPainel(){
+  const emTram=estado.processos.filter(p=>p.local_id!=null).length;
+  const it=[["Unidades",D.n_unidades],["Vagas (Anexo I)",D.vagas],["Processos",estado.processos.length],
+    ["Em tramitação",emTram],["Ritos",Object.keys(D.ritos).length],["Setores com login",D.login_sectors.length]];
+  document.getElementById("ind").innerHTML=it.map(([n,v])=>`<div class="ind"><div class="v">${v}</div><div class="n">${n}</div></div>`).join("");
+}
+function nodo(n){let h=`<li><span class="no">${n.nome}${n.grau?`<span class="grau">grau ${n.grau}</span>`:""}</span>`;
+  if(n.sub&&n.sub.length){const oc=(n.grau===1||n.nome==="Gabinetes de Vereadores");
+    h+=`<ul${oc?' style="display:none"':''}>`+n.sub.map(nodo).join("")+`</ul>`;}return h+`</li>`;}
+function renderOrg(){document.getElementById("arv").innerHTML=`<ul class="arv">${nodo(D.organograma)}</ul>`;
+  document.querySelectorAll("#arv .no").forEach(s=>s.onclick=()=>{const u=s.parentElement.querySelector("ul");if(u)u.style.display=u.style.display==="none"?"":"none";});}
+function renderRitos(){document.getElementById("ritos").innerHTML=Object.entries(D.ritos).map(([c,r])=>
+  `<div class="rito"><h3>${c} — ${r.nome} <span class="grau">${r.dominio}</span></h3><div class="passos">`+
+  r.etapas.map((e,i)=>(i?'<div class="seta">→</div>':'')+`<div class="passo"><div class="o">Etapa ${e.ordem}${e.prazo_dias?` · ${e.prazo_dias}d`:''}</div><div class="u">${e.unidade}</div><div class="a">${e.acao}</div></div>`).join("")+`</div></div>`).join("");}
+
+function ritosQuePodemIniciar(uid){
+  return Object.entries(D.ritos).filter(([c,r])=>subordinada(uid,r.etapas[0].unidade_id));
+}
+function renderNovo(){
+  const u=unidadeAtual();document.getElementById("novo-setor").textContent=u?`— ${u.nome}`:"";
+  const box=document.getElementById("novo-corpo");
+  if(!u){box.innerHTML=`<div class="info">Entre como um setor para iniciar um processo.</div>`;return;}
+  const opts=ritosQuePodemIniciar(u.id);
+  if(!opts.length){box.innerHTML=`<div class="info">O seu setor <b>não inicia</b> processos — ele recebe, instrui e encaminha os que chegam à sua caixa. Iniciam processos: gabinetes (proposições) e a Secretaria-Geral (protocolo).</div>`;return;}
+  box.innerHTML=`<div class="hint">Inicie um processo com origem no seu setor. Ele entrará na sua caixa para você encaminhar pelo rito.</div>
+    <div class="form"><label>Tipo<select id="nv-tipo">${opts.map(([c,r])=>`<option value="${c}">${c} — ${r.nome}</option>`).join("")}</select></label>
+    <label>Ementa / assunto<input id="nv-assunto" placeholder="Ex.: Institui a Semana Municipal do Livro"></label>
+    <button class="acao" id="nv-criar">Protocolar / apresentar</button></div>`;
+  document.getElementById("nv-criar").onclick=()=>{
+    const assunto=document.getElementById("nv-assunto").value.trim();
+    if(!assunto){toast("Informe o assunto.");return;}
+    const tipo=document.getElementById("nv-tipo").value;
+    const ano=2025;const numero=Math.max(0,...estado.processos.filter(p=>p.ano===ano).map(p=>p.numero))+1;
+    estado.seq++;estado.processos.push({id:estado.seq,numero,ano,tipo:D.ritos[tipo].dominio,assunto,origem_id:u.id,rito:tipo,local_id:u.id});
+    salvar();toast(`Processo ${numero}/${ano} criado na sua caixa.`);aba="caixa";pinta();renderPainel();
+  };
+}
+function renderCaixa(){
+  const u=unidadeAtual();const box=document.getElementById("cx");
+  document.getElementById("cx-setor").textContent=u?`— ${u.nome}`:(atuando==="ADMIN"?"— Admin (todos)":"");
+  const meus=estado.processos.filter(p=>p.local_id!=null&&(atuando==="ADMIN"||(u&&p.local_id===u.id)));
+  if(!meus.length){box.innerHTML=`<div class="info">Nenhum processo na sua caixa agora.</div>`;return;}
+  box.innerHTML=`<table><thead><tr><th>Processo</th><th>Assunto</th><th>Próximo setor</th><th>Ação prevista</th><th></th></tr></thead><tbody>${
+    meus.map(p=>{const px=proxima(p);return `<tr><td>${p.numero}/${p.ano}</td><td>${p.assunto}</td>
+      <td class="local">${px?px.unidade:"— fim do rito —"}</td><td>${px?px.acao:"concluir"}</td>
+      <td>${px?`<button class="acao" data-id="${p.id}">Encaminhar →</button>`:`<button class="acao sec" data-fim="${p.id}">Concluir</button>`}</td></tr>`;}).join("")}</tbody></table>`;
+  box.querySelectorAll("button[data-id]").forEach(b=>b.onclick=()=>{
+    const p=estado.processos.find(x=>x.id==b.dataset.id);const px=proxima(p);
+    p.local_id=px.unidade_id;salvar();toast(`Encaminhado para ${px.unidade}.`);renderCaixa();renderPainel();});
+  box.querySelectorAll("button[data-fim]").forEach(b=>b.onclick=()=>{
+    const p=estado.processos.find(x=>x.id==b.dataset.fim);p.situacao="CONCLUIDO";p.local_id=null;
+    salvar();toast(`Processo ${p.numero}/${p.ano} concluído.`);renderCaixa();renderPainel();});
+}
+function renderProp(){
+  const u=unidadeAtual();document.getElementById("pr-setor").textContent=u?`— ${u.nome}`:"";
+  const box=document.getElementById("pr");
+  if(!u){box.innerHTML=`<div class="info">Entre como um setor.</div>`;return;}
+  const meus=estado.processos.filter(p=>p.origem_id===u.id);
+  if(!meus.length){box.innerHTML=`<div class="info">Seu setor ainda não iniciou proposições.</div>`;return;}
+  box.innerHTML=`<table><thead><tr><th>Processo</th><th>Assunto</th><th>Situação</th><th>Onde está agora</th></tr></thead><tbody>${
+    meus.map(p=>`<tr><td>${p.numero}/${p.ano}</td><td>${p.assunto}</td>
+      <td><span class="badge">${SIT[p.situacao||"EM_TRAMITACAO"]}</span></td>
+      <td class="local">${p.local_id==null?"Arquivo (concluído)":UNI[p.local_id].nome}</td></tr>`).join("")}</tbody></table>`;
+}
+function renderSetor(){
+  const u=unidadeAtual();const box=document.getElementById("ms");
+  document.getElementById("ms-setor").textContent=u?`— ${u.nome}`:(atuando==="ADMIN"?"— Administração":"");
+  if(!u){box.innerHTML=atuando==="ADMIN"?`<div class="info">Administrador: acesso a todas as áreas e atos.</div>`:`<div class="info">Entre como um setor.</div>`;return;}
+  const ar=areasDe(u.id),ac=acoesDe(u.id),cp=D.competencias[u.id]||[];
+  let h=`<div class="hint">Áreas que este setor opera:</div><div class="chips">${ar.map(a=>`<span class="chip">${a}</span>`).join("")}</div>`;
+  if(cp.length)h+=`<div class="hint" style="margin-top:12px">Competências (Lei nº 3.525/2025):</div><ul class="comp">${cp.map(c=>`<li>${c}</li>`).join("")}</ul>`;
+  if(ar.includes("LEGISLATIVO")){
+    h+=`<div class="hint" style="margin-top:12px">Atos legislativos — o que a lei permite a este setor:</div><div class="chips">${
+      ACOES.map(([k,r])=>{const ok=ac.includes(k);return `<span class="chip ${ok?"ok":"no"}">${ok?"✓":"✕"} ${r}</span>`;}).join("")}</div>`;
+    const ved=ACOES.filter(([k])=>!ac.includes(k)).map(([,r])=>r);
+    if(ved.length)h+=`<div class="aviso">Trava por competência: este setor <b>não</b> pode ${ved.join(", ").toLowerCase()} — a lei atribui esses atos a outro órgão.</div>`;
+  }
+  box.innerHTML=h;
+}
+function render(){renderAtuar();renderPainel();renderOrg();renderRitos();renderMenu();}
+document.getElementById("reset").onclick=()=>{if(confirm("Reiniciar todos os dados deste navegador?")){localStorage.removeItem(KEY);estado=carregar();atuando=null;aba="painel";render();toast("Dados reiniciados.");}};
+render();
+</script>
+</body>
+</html>
