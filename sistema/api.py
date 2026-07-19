@@ -403,6 +403,30 @@ class Aplicacao:
             for pid, numero, ano, assunto, situacao, loc, prop in linhas
         ]
 
+    def apresentar_do_setor(self, dados):
+        """O setor (ex.: gabinete) apresenta uma proposição de autoria própria.
+
+        Cria a proposição numerada e autua o processo COM ORIGEM no próprio
+        setor, vinculando o rito quando houver — assim a matéria entra na
+        caixa do setor e pode ser encaminhada.
+        """
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
+        unidade = self.usuario_atual.get("unidade_id")
+        tipo = dados["tipo"]
+        proposicao_id, rotulo = legislativo.apresentar_proposicao(
+            self.banco, tipo, dados["ementa"], dados["data"],
+            unidade_protocolo_id=unidade)
+        linha = self.banco.execute(
+            "SELECT processo_id FROM proposicao WHERE id = ?", (proposicao_id,)
+        ).fetchone()
+        tem_rito = self.banco.execute(
+            "SELECT 1 FROM tipo_processo WHERE codigo = ?", (tipo,)).fetchone()
+        if linha and linha[0] and tem_rito:
+            fluxo.vincular_tipo(self.banco, linha[0], tipo)
+        self.banco.commit()
+        return {"id": proposicao_id, "rotulo": rotulo}
+
     def tramitar_pelo_fluxo(self, processo_id: int, dados):
         autenticacao.exigir_posse(self.banco, self.usuario_atual, processo_id)
         etapa = fluxo.tramitar_pelo_fluxo(
@@ -608,6 +632,8 @@ ROTAS = [
     ("GET", r"^/caixa$", "*", lambda app, m, d: app.caixa()),
     ("GET", r"^/minhas-proposicoes$", "*",
      lambda app, m, d: app.minhas_proposicoes()),
+    ("POST", r"^/minhas-proposicoes$", "LEGISLATIVO",
+     lambda app, m, d: app.apresentar_do_setor(d)),
     ("GET", r"^/organograma$", None, lambda app, m, d: app.organograma()),
     ("GET", r"^/unidades$", None, lambda app, m, d: app.unidades()),
     ("GET", r"^/cargos$", None, lambda app, m, d: app.cargos()),

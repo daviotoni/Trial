@@ -77,6 +77,7 @@
   <button data-aba="organograma" data-area="__publico">Organograma</button>
   <button data-aba="caixa" data-area="__login">Minha caixa</button>
   <button data-aba="proposicoes-setor" data-area="__login">Minhas proposições</button>
+  <button data-aba="nova-proposicao" data-area="acao:APRESENTAR_PROPOSICAO">Nova proposição</button>
   <button data-aba="cargos" data-area="PESSOAL">Cargos e vagas</button>
   <button data-aba="protocolo" data-area="PROTOCOLO">Protocolo</button>
   <button data-aba="plenario" data-area="LEGISLATIVO">Plenário</button>
@@ -112,6 +113,26 @@
       <thead><tr><th>Proposição</th><th>Assunto</th><th>Situação</th><th>Onde está agora</th></tr></thead>
       <tbody></tbody>
     </table>
+  </div>
+</section>
+
+<section id="nova-proposicao">
+  <div class="cartao">
+    <h2>Apresentar proposição <small id="np-setor" style="font-weight:normal"></small></h2>
+    <p style="color:#555">Inicie uma proposição de autoria do seu setor. Ela entra na sua <b>caixa</b> para ser encaminhada pelo rito.</p>
+    <label>Tipo</label>
+    <select id="np-tipo">
+      <option value="PL">PL — Projeto de Lei</option>
+      <option value="PDL">PDL — Projeto de Decreto Legislativo</option>
+      <option value="PR">PR — Projeto de Resolução</option>
+      <option value="REQUERIMENTO">Requerimento</option>
+      <option value="INDICACAO">Indicação</option>
+      <option value="MOCAO">Moção</option>
+    </select>
+    <label>Ementa / assunto</label>
+    <textarea id="np-ementa" rows="2" placeholder="Ex.: Institui a Semana Municipal do Livro."></textarea>
+    <button class="acao" id="btn-apresentar">Apresentar proposição</button>
+    <p id="msg-np" class="msg"></p>
   </div>
 </section>
 
@@ -340,12 +361,14 @@ const selecionarAba = (aba) => {
 const aplicarPermissoes = () => {
   const logado = !!localStorage.getItem("token");
   const areas = JSON.parse(localStorage.getItem("areas") || "[]");
+  const acoes = JSON.parse(localStorage.getItem("acoes") || "[]");
   const temUnidade = !!localStorage.getItem("unidade_id");
   document.querySelectorAll("#menu button").forEach(b => {
     const area = b.dataset.area;
     let ver;
     if (area === "__publico") ver = true;
     else if (area === "__login") ver = logado && temUnidade;
+    else if (area.startsWith("acao:")) ver = logado && acoes.includes(area.slice(5));
     else ver = logado && areas.includes(area);
     b.style.display = ver ? "" : "none";
   });
@@ -470,6 +493,9 @@ const aoEntrar = async () => {
   const eu = await consultar("/me");
   localStorage.setItem("perfil", eu.perfil);
   localStorage.setItem("areas", JSON.stringify(eu.areas || []));
+  localStorage.setItem("acoes", JSON.stringify(eu.acoes || []));
+  const npS = document.getElementById("np-setor");
+  if (npS) npS.textContent = eu.unidade ? "— " + eu.unidade : "";
   if (eu.unidade_id) localStorage.setItem("unidade_id", eu.unidade_id);
   if (eu.unidade) localStorage.setItem("unidade", eu.unidade);
   mostrarStatusLogin();
@@ -527,6 +553,20 @@ document.getElementById("btn-criar-usuario").addEventListener("click", async () 
     document.getElementById("us-senha").value = "";
     carregarUsuarios();
   } catch (e) { mostrar("msg-usuario", e.message, "erro"); }
+});
+
+// ----- Nova proposição (o setor apresenta) -----
+document.getElementById("btn-apresentar").addEventListener("click", async () => {
+  const tipo = document.getElementById("np-tipo").value;
+  const ementa = document.getElementById("np-ementa").value.trim();
+  if (!ementa) { mostrar("msg-np", "Escreva a ementa/assunto.", "erro"); return; }
+  try {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const r = await enviar("/minhas-proposicoes", {tipo, ementa, data: hoje});
+    mostrar("msg-np", `Proposição ${r.rotulo} apresentada — está na sua caixa.`, "ok");
+    document.getElementById("np-ementa").value = "";
+    carregarCaixa(); carregarProposicoes();
+  } catch (e) { mostrar("msg-np", e.message, "erro"); }
 });
 
 document.getElementById("btn-login").addEventListener("click", async () => {
