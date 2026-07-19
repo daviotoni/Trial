@@ -5,3 +5,6 @@ __pycache__/
 venv/
 .pytest_cache/
 .mypy_cache/
+
+# Banco SQLite gerado ao rodar a API (python -m sistema.api)
+*.db
