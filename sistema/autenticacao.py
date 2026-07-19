@@ -22,7 +22,9 @@ import sqlite3
 
 # Áreas funcionais do sistema (usadas na marcação das rotas da API).
 AREAS = {"PESSOAL", "FOLHA", "PROTOCOLO", "LEGISLATIVO", "COMPRAS",
-         "TRANSPARENCIA", "CONTROLE", "JURIDICO", "USUARIOS"}
+         "TRANSPARENCIA", "CONTROLE", "JURIDICO", "COMUNICACAO", "SEGURANCA",
+         "SERVICOS", "PATRIMONIO", "DOCUMENTACAO", "OUVIDORIA", "CAPACITACAO",
+         "PLANEJAMENTO", "ADMINISTRACAO", "USUARIOS"}
 
 # O que cada perfil pode operar.
 PERFIS = {

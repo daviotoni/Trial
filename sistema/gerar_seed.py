@@ -61,6 +61,40 @@ UNIDADE_AREAS = {
     "Coordenadoria de Atas e Projetos": ["LEGISLATIVO"],
     "Assistência às Comissões Permanentes": ["LEGISLATIVO"],
     "Coordenadoria de Tecnologia da Informação e Comunicação": ["USUARIOS"],
+    # Órgãos de 1º grau
+    "Diretoria-Geral": ["ADMINISTRACAO"],
+    "Superintendência-Geral": ["ADMINISTRACAO"],
+    "Superintendência de Assuntos Estratégicos": ["PLANEJAMENTO"],
+    "Diretoria da Escola do Legislativo": ["CAPACITACAO"],
+    "Ouvidoria-Geral": ["OUVIDORIA"],
+    # Coordenadorias (2º grau) restantes
+    "Coordenadoria de Cerimonial e Comunicação Social": ["COMUNICACAO"],
+    "Coordenadoria de Documentação Histórica": ["DOCUMENTACAO"],
+    "Coordenadoria de Manutenção": ["SERVICOS"],
+    "Coordenadoria de Patrimônio": ["PATRIMONIO"],
+    "Coordenadoria de Polícia Legislativa": ["SEGURANCA"],
+    "Coordenadoria de Prevenção a Incêndio": ["SEGURANCA"],
+    "Coordenadoria de Redação Oficial e Legislativa": ["LEGISLATIVO"],
+    "Diretoria Administrativa": ["ADMINISTRACAO"],
+    # Assessoramento parlamentar (3º grau)
+    "Assessores Parlamentares": ["LEGISLATIVO"],
+    "Assessoria Especial da Presidência": ["ADMINISTRACAO"],
+    "Assessoria de Gabinete Parlamentar": ["LEGISLATIVO"],
+    # Serviços auxiliares (4º grau)
+    "Limpeza": ["SERVICOS"],
+    "Manutenção Predial": ["SERVICOS"],
+    "Reprografia": ["SERVICOS"],
+    "Serviços de Copa": ["SERVICOS"],
+    "Telefonia": ["SERVICOS"],
+    "Transporte": ["SERVICOS"],
+    "Vigilância Patrimonial": ["SEGURANCA"],
+    # Comissões permanentes administrativas (art. 45)
+    "Comissão Permanente de Aplicação de Sanções": ["COMPRAS"],
+    "Comissão Permanente de Atualização e Consolidação de Leis e Normas "
+    "Municipais": ["JURIDICO"],
+    "Comissão Permanente de Proteção de Dados Pessoais": ["JURIDICO"],
+    "Comissão Permanente de Recebimento Definitivo de Obras, Serviços e Bens":
+        ["COMPRAS"],
 }
 
 # Ações legislativas específicas e quem pode praticá-las (trava fina por

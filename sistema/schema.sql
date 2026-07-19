@@ -401,7 +401,9 @@ CREATE TABLE unidade_area (
     area       TEXT NOT NULL CHECK (area IN
                  ('PESSOAL', 'FOLHA', 'PROTOCOLO', 'LEGISLATIVO',
                   'COMPRAS', 'TRANSPARENCIA', 'CONTROLE', 'JURIDICO',
-                  'USUARIOS')),
+                  'COMUNICACAO', 'SEGURANCA', 'SERVICOS', 'PATRIMONIO',
+                  'DOCUMENTACAO', 'OUVIDORIA', 'CAPACITACAO', 'PLANEJAMENTO',
+                  'ADMINISTRACAO', 'USUARIOS')),
     PRIMARY KEY (unidade_id, area)
 );
 

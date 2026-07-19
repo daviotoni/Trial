@@ -17,6 +17,27 @@ class TestBancoSistema(unittest.TestCase):
     def _um(self, sql):
         return self.banco.execute(sql).fetchone()[0]
 
+    def test_todo_setor_tem_atividade(self):
+        # Invariante do modelo: cada setor (unidade) tem ao menos uma
+        # atividade/área mapeada — exceto o nó agrupador dos gabinetes.
+        sem_area = self.banco.execute(
+            """SELECT nome FROM unidade u
+                WHERE u.nome <> 'Gabinetes de Vereadores'
+                  AND NOT EXISTS (SELECT 1 FROM unidade_area a
+                                   WHERE a.unidade_id = u.id)"""
+        ).fetchall()
+        self.assertEqual(sem_area, [], f"setores sem atividade: {sem_area}")
+
+    def test_todo_setor_tem_competencia(self):
+        # Cada setor tem competência legal cadastrada (exceto o agrupador).
+        sem_comp = self.banco.execute(
+            """SELECT nome FROM unidade u
+                WHERE u.nome <> 'Gabinetes de Vereadores'
+                  AND NOT EXISTS (SELECT 1 FROM competencia c
+                                   WHERE c.unidade_id = u.id)"""
+        ).fetchall()
+        self.assertEqual(sem_comp, [], f"setores sem competência: {sem_comp}")
+
     def test_unidades_carregadas(self):
         # 49 unidades da estrutura da Lei 3.525 + 29 gabinetes (roster).
         self.assertEqual(self._um("SELECT COUNT(*) FROM unidade"), 78)

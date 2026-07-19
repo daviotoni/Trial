@@ -188,6 +188,34 @@ SERVICOS_AUXILIARES = [
     "Vigilância Patrimonial",
 ]
 
+# Competência de cada serviço auxiliar (4º grau). Só o e-Social tem artigo
+# próprio (art. 48); os demais aparecem nas competências de outros órgãos.
+COMPETENCIAS_SERVICO_AUXILIAR = {
+    "Departamento do e-Social":
+        "Gestão, consolidação e envio das informações trabalhistas, "
+        "previdenciárias e fiscais ao e-Social (art. 48)",
+    "Serviços de Copa":
+        "Serviços de copa e apoio, geridos pela Coordenadoria de Manutenção "
+        "(art. 29, V)",
+    "Manutenção Predial":
+        "Manutenção predial e das instalações (art. 29)",
+    "Telefonia":
+        "Serviços de telefonia, sob supervisão da Diretoria-Geral "
+        "(art. 15, VIII)",
+    "Reprografia":
+        "Reprografia; manutenção dos equipamentos pela Coordenadoria de "
+        "Manutenção (art. 29, VIII)",
+    "Limpeza":
+        "Serviços de limpeza, coordenados pela Coordenadoria de Manutenção "
+        "(art. 29, I, X e XI)",
+    "Transporte":
+        "Serviços de transporte, sob supervisão do Diretor Administrativo "
+        "(art. 78, III)",
+    "Vigilância Patrimonial":
+        "Vigilância e segurança patrimonial, fiscalizada pela Polícia "
+        "Legislativa (art. 32, II)",
+}
+
 # Comissões permanentes de apoio à administração (art. 45, §1º). Membros
 # fazem jus a gratificação de 40% (art. 46, §2º).
 COMISSOES_PERMANENTES_ADMINISTRATIVAS = [
@@ -417,7 +445,11 @@ def construir_cmdc() -> Orgao:
         u for u in diretoria_geral.subunidades if u.nome == "Diretoria Administrativa"
     )
     for nome in SERVICOS_AUXILIARES:
-        diretoria_admin.adicionar_subunidade(UnidadeAdministrativa(nome=nome))
+        servico = diretoria_admin.adicionar_subunidade(
+            UnidadeAdministrativa(nome=nome))
+        descricao = COMPETENCIAS_SERVICO_AUXILIAR.get(
+            nome, "Serviço auxiliar de apoio logístico (Diretoria Administrativa)")
+        servico.adicionar_competencia(Competencia(descricao, LEI_3525))
 
     return cmdc
 
