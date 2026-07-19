@@ -40,6 +40,8 @@ VEREADORES_20A_LEGISLATURA = [
 # Áreas funcionais operadas por cada setor (unidade → áreas). Base do
 # controle de acesso por unidade: quem trabalha ali herda estas áreas.
 UNIDADE_AREAS = {
+    "Presidência": ["LEGISLATIVO"],
+    "Mesa Diretora": ["LEGISLATIVO"],
     "Coordenadoria da Secretaria-Geral": ["PROTOCOLO"],
     "Coordenadoria de Recursos Humanos": ["PESSOAL", "FOLHA"],
     "Departamento do e-Social": ["FOLHA"],
