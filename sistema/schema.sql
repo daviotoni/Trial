@@ -278,6 +278,16 @@ CREATE TABLE proposicao (
     unidade_autora_id   INTEGER REFERENCES unidade (id),  -- gabinete/setor autor
     processo_id         INTEGER REFERENCES processo (id),
     situacao            TEXT NOT NULL DEFAULT 'EM_TRAMITACAO',
+    -- Requerimento DERIVADO (arts. 107-113 do Regimento): pedido do autor
+    -- sobre outra proposição sua. `finalidade` diz o que se requer e
+    -- `proposicao_alvo_id` aponta a matéria alvo; NULL nas proposições
+    -- comuns. O deferimento (despacho do Presidente, arts. 108-110) ou a
+    -- aprovação em Plenário (arts. 111-113) aplica o efeito.
+    finalidade          TEXT CHECK (finalidade IN
+                          ('RETIRADA', 'INCLUSAO_PAUTA', 'DESARQUIVAMENTO')),
+    proposicao_alvo_id  INTEGER REFERENCES proposicao (id),
+    despacho            TEXT,               -- teor do despacho do Presidente
+    despacho_data       TEXT,
     UNIQUE (tipo, numero, ano)
 );
 

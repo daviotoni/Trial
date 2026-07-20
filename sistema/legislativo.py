@@ -22,7 +22,10 @@ from __future__ import annotations
 import sqlite3
 
 from sistema import comissoes
-from sistema.servicos import RegraViolada, autuar_processo
+from sistema.servicos import (
+    RegraViolada, arquivar_processo, autuar_processo, concluir_processo,
+    desarquivar_processo,
+)
 
 # Comissões permanentes temáticas do art. 33 do Regimento Interno
 # (Resolução nº 1.835/2000, com a redação da Resolução nº 2.399/2013).
@@ -337,6 +340,340 @@ def protocolar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
     return rascunho_id, rotulo
 
 
+# ------------------------------------------------------------------
+# Bloco 4: requerimentos derivados, despacho do Presidente e
+# acompanhamento (arts. 90, 93-95 e 107-113 do Regimento Interno)
+# ------------------------------------------------------------------
+
+# O que o autor pode requerer sobre uma proposição sua já protocolada.
+# A espécie (subtipo) segue o Regimento: retirada de matéria SEM parecer
+# é despacho do Presidente (art. 110, I); com parecer, deliberação do
+# Plenário (art. 111); inclusão em pauta e desarquivamento deliberam-se
+# em Plenário (arts. 111-113).
+FINALIDADES_REQUERIMENTO = {
+    "RETIRADA": {
+        "nome": "Retirada da proposição",
+        "ementa": "Requer a retirada da proposição {alvo}",
+        "base": "arts. 110, I, e 111, III",
+    },
+    "INCLUSAO_PAUTA": {
+        "nome": "Inclusão na Ordem do Dia",
+        "ementa": "Requer a inclusão da proposição {alvo} na Ordem do Dia",
+        "base": "arts. 111-113",
+    },
+    "DESARQUIVAMENTO": {
+        "nome": "Desarquivamento da proposição",
+        "ementa": "Requer o desarquivamento da proposição {alvo}",
+        "base": "arts. 111-113",
+    },
+}
+
+
+def _alvo_do_gabinete(banco, proposicao_alvo_id, unidade_id):
+    """Carrega a proposição alvo validando que pertence ao gabinete."""
+    linha = banco.execute(
+        """SELECT p.tipo, p.numero, p.ano, p.situacao, p.processo_id,
+                  p.unidade_autora_id, p.autor_parlamentar_id,
+                  (SELECT situacao FROM processo WHERE id = p.processo_id)
+             FROM proposicao p WHERE p.id = ?""", (proposicao_alvo_id,),
+    ).fetchone()
+    if linha is None or linha[3] == "RASCUNHO" or linha[1] is None:
+        raise RegraViolada("proposição alvo inexistente ou não protocolada")
+    titular = parlamentar_do_gabinete(banco, unidade_id)
+    if linha[5] != unidade_id and (linha[6] is None or linha[6] != titular):
+        raise RegraViolada(
+            "só o autor pode requerer sobre a própria proposição nesta fase")
+    return {"tipo": linha[0], "rotulo": f"{linha[0]} {linha[1]}/{linha[2]}",
+            "situacao": linha[3], "processo_id": linha[4],
+            "situacao_processo": linha[7]}
+
+
+def requerimento_derivado(
+    banco: sqlite3.Connection,
+    unidade_id: int,
+    proposicao_alvo_id: int,
+    finalidade: str,
+    data: str,
+    justificativa: str,
+) -> tuple[int, str]:
+    """Protocola um REQUERIMENTO do autor sobre proposição sua.
+
+    Finalidades: RETIRADA, INCLUSAO_PAUTA e DESARQUIVAMENTO (arts.
+    107-113). O requerimento nasce protocolado (numerado e autuado com
+    origem no gabinete); a espécie é definida pela regra regimental. O
+    efeito sobre a matéria alvo só ocorre no deferimento (despacho) ou
+    na aprovação em Plenário.
+    """
+    meta = FINALIDADES_REQUERIMENTO.get(finalidade)
+    if meta is None:
+        raise RegraViolada("finalidade deve ser RETIRADA, INCLUSAO_PAUTA "
+                           "ou DESARQUIVAMENTO")
+    if not justificativa or not justificativa.strip():
+        raise RegraViolada(
+            "a justificativa é obrigatória (art. 88, §4º)")
+    alvo = _alvo_do_gabinete(banco, proposicao_alvo_id, unidade_id)
+
+    if finalidade == "DESARQUIVAMENTO":
+        if alvo["situacao_processo"] != "ARQUIVADO":
+            raise RegraViolada(
+                "desarquivamento só cabe a proposição com processo "
+                "arquivado")
+    else:
+        if alvo["situacao"] != "EM_TRAMITACAO" or \
+                alvo["situacao_processo"] in ("ARQUIVADO", "CONCLUIDO"):
+            raise RegraViolada(
+                f"a proposição {alvo['rotulo']} não está em tramitação")
+        if finalidade == "INCLUSAO_PAUTA" and \
+                comissoes.exige_parecer(alvo["tipo"]) and \
+                not comissoes.tem_parecer_aprovado(banco, proposicao_alvo_id):
+            raise RegraViolada(
+                "inclusão em pauta exige parecer de comissão aprovado "
+                "(ou regime de urgência)")
+
+    pendente = banco.execute(
+        "SELECT COUNT(*) FROM proposicao WHERE proposicao_alvo_id = ? AND "
+        "finalidade = ? AND situacao = 'EM_TRAMITACAO'",
+        (proposicao_alvo_id, finalidade),
+    ).fetchone()[0]
+    if pendente:
+        raise RegraViolada(
+            "já há requerimento pendente com a mesma finalidade sobre "
+            "essa proposição")
+
+    tem_parecer = banco.execute(
+        "SELECT COUNT(*) FROM parecer WHERE proposicao_id = ?",
+        (proposicao_alvo_id,),
+    ).fetchone()[0] > 0
+    if finalidade == "RETIRADA" and not tem_parecer:
+        subtipo = "DESPACHO_PRESIDENTE"     # art. 110, I
+    else:
+        subtipo = "DELIBERACAO_PLENARIO"    # arts. 111-113
+
+    ano = int(data[:4])
+    (ultimo,) = banco.execute(
+        "SELECT COALESCE(MAX(numero), 0) FROM proposicao "
+        "WHERE tipo = 'REQUERIMENTO' AND ano = ?", (ano,),
+    ).fetchone()
+    numero = ultimo + 1
+    rotulo = f"REQUERIMENTO {numero}/{ano}"
+    ementa = meta["ementa"].format(alvo=alvo["rotulo"])
+
+    processo_id, _ = autuar_processo(
+        banco, "LEGISLATIVO", f"{rotulo} — {ementa}", unidade_id, data)
+    if banco.execute("SELECT 1 FROM tipo_processo WHERE codigo = "
+                     "'REQUERIMENTO'").fetchone():
+        from sistema import fluxo as fluxo_mod
+        fluxo_mod.vincular_tipo(banco, processo_id, "REQUERIMENTO")
+
+    requerimento_id = banco.execute(
+        "INSERT INTO proposicao (tipo, subtipo, numero, ano, ementa, "
+        "justificativa, autor_parlamentar_id, unidade_autora_id, "
+        "processo_id, situacao, finalidade, proposicao_alvo_id) "
+        "VALUES ('REQUERIMENTO', ?, ?, ?, ?, ?, ?, ?, ?, "
+        "'EM_TRAMITACAO', ?, ?)",
+        (subtipo, numero, ano, ementa, justificativa.strip(),
+         parlamentar_do_gabinete(banco, unidade_id), unidade_id,
+         processo_id, finalidade, proposicao_alvo_id),
+    ).lastrowid
+    return requerimento_id, rotulo
+
+
+def _aplicar_efeito_requerimento(banco: sqlite3.Connection,
+                                 requerimento_id: int) -> None:
+    """Aplica sobre a matéria alvo o efeito do requerimento deferido/aprovado.
+
+    RETIRADA: a proposição sai de tramitação (situação RETIRADA) e o
+    processo é arquivado. DESARQUIVAMENTO: o processo volta a tramitar.
+    INCLUSAO_PAUTA: sem efeito automático — o deferimento instrui a
+    Diretoria de Plenário a pautar.
+    """
+    linha = banco.execute(
+        "SELECT finalidade, proposicao_alvo_id FROM proposicao WHERE id = ?",
+        (requerimento_id,),
+    ).fetchone()
+    if not linha or not linha[0] or not linha[1]:
+        return
+    finalidade, alvo_id = linha
+    alvo = banco.execute(
+        "SELECT situacao, processo_id, (SELECT situacao FROM processo "
+        "WHERE id = processo_id) FROM proposicao WHERE id = ?", (alvo_id,),
+    ).fetchone()
+    if alvo is None:
+        return
+    situacao_alvo, processo_alvo, situacao_processo = alvo
+    if finalidade == "RETIRADA":
+        banco.execute(
+            "UPDATE proposicao SET situacao = 'RETIRADA' WHERE id = ?",
+            (alvo_id,))
+        if processo_alvo and situacao_processo not in (None, "ARQUIVADO"):
+            arquivar_processo(banco, processo_alvo)
+    elif finalidade == "DESARQUIVAMENTO":
+        if processo_alvo and situacao_processo == "ARQUIVADO":
+            desarquivar_processo(banco, processo_alvo)
+        if situacao_alvo == "RETIRADA":
+            banco.execute(
+                "UPDATE proposicao SET situacao = 'EM_TRAMITACAO' "
+                "WHERE id = ?", (alvo_id,))
+
+
+def despachar_requerimento(
+    banco: sqlite3.Connection,
+    requerimento_id: int,
+    resultado: str,
+    data: str,
+    texto: str | None = None,
+) -> str:
+    """Despacho do Presidente sobre requerimento (arts. 108-110).
+
+    Só a espécie DESPACHO_PRESIDENTE se resolve aqui; as de deliberação
+    vão a Plenário (pauta + votação). DEFERIDO aplica o efeito sobre a
+    matéria alvo; em ambos os resultados o processo do requerimento é
+    concluído.
+    """
+    if resultado not in ("DEFERIDO", "INDEFERIDO"):
+        raise RegraViolada("resultado deve ser DEFERIDO ou INDEFERIDO")
+    linha = banco.execute(
+        "SELECT tipo, subtipo, situacao, processo_id, (SELECT situacao "
+        "FROM processo WHERE id = processo_id) FROM proposicao WHERE id = ?",
+        (requerimento_id,),
+    ).fetchone()
+    if linha is None or linha[0] != "REQUERIMENTO":
+        raise RegraViolada("requerimento inexistente")
+    tipo, subtipo, situacao, processo_id, situacao_processo = linha
+    if subtipo != "DESPACHO_PRESIDENTE":
+        raise RegraViolada(
+            "requerimento sujeito a deliberação do Plenário, não a "
+            "despacho (art. 111)")
+    if situacao != "EM_TRAMITACAO":
+        raise RegraViolada(f"requerimento já {situacao.lower()}")
+
+    banco.execute(
+        "UPDATE proposicao SET situacao = ?, despacho = ?, "
+        "despacho_data = ? WHERE id = ?",
+        (resultado, texto, data, requerimento_id))
+    if resultado == "DEFERIDO":
+        _aplicar_efeito_requerimento(banco, requerimento_id)
+    if processo_id and situacao_processo in ("EM_TRAMITACAO", "SOBRESTADO"):
+        concluir_processo(banco, processo_id)
+    return resultado
+
+
+def despachos_pendentes(banco: sqlite3.Connection) -> list[dict]:
+    """Requerimentos aguardando despacho do Presidente (arts. 108-110)."""
+    return [
+        {"id": rid, "rotulo": f"REQUERIMENTO {numero}/{ano}",
+         "ementa": ementa, "justificativa": justificativa,
+         "autor": autor, "gabinete": gabinete, "finalidade": finalidade,
+         "alvo": alvo}
+        for (rid, numero, ano, ementa, justificativa, autor, gabinete,
+             finalidade, alvo) in banco.execute(
+            """SELECT p.id, p.numero, p.ano, p.ementa, p.justificativa,
+                      pl.nome, u.nome, p.finalidade,
+                      (SELECT a.tipo || ' ' || a.numero || '/' || a.ano
+                         FROM proposicao a WHERE a.id = p.proposicao_alvo_id)
+                 FROM proposicao p
+                 LEFT JOIN parlamentar pl ON pl.id = p.autor_parlamentar_id
+                 LEFT JOIN unidade u ON u.id = p.unidade_autora_id
+                WHERE p.tipo = 'REQUERIMENTO'
+                  AND p.subtipo = 'DESPACHO_PRESIDENTE'
+                  AND p.situacao = 'EM_TRAMITACAO'
+                ORDER BY p.id""",
+        )
+    ]
+
+
+def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
+                               referencia: str) -> list[dict]:
+    """Acompanhamento rico das proposições do gabinete (arts. 90 e 93-95).
+
+    Para cada proposição protocolada do setor: situação, localização
+    atual do processo, pareceres, ALERTAS (arquivamento, prazo vencido,
+    parecer contrário) e as finalidades de requerimento derivado
+    cabíveis no estado atual. `referencia` (ISO) é a data usada para
+    apurar prazos vencidos.
+    """
+    linhas = banco.execute(
+        """SELECT p.id, p.tipo, p.subtipo, p.numero, p.ano, p.ementa,
+                  p.regime, p.situacao, p.finalidade, p.despacho,
+                  p.despacho_data, p.processo_id, pr.situacao,
+                  COALESCE(
+                    (SELECT ud.nome FROM tramitacao t
+                       JOIN unidade ud ON ud.id = t.unidade_destino_id
+                      WHERE t.processo_id = pr.id
+                      ORDER BY t.id DESC LIMIT 1),
+                    (SELECT uo.nome FROM unidade uo
+                      WHERE uo.id = pr.unidade_origem_id)),
+                  (SELECT t.prazo FROM tramitacao t
+                    WHERE t.processo_id = pr.id
+                      AND t.data_recebimento IS NULL AND t.prazo IS NOT NULL
+                    ORDER BY t.id DESC LIMIT 1),
+                  (SELECT a.tipo || ' ' || a.numero || '/' || a.ano
+                     FROM proposicao a WHERE a.id = p.proposicao_alvo_id)
+             FROM proposicao p
+             LEFT JOIN processo pr ON pr.id = p.processo_id
+            WHERE p.situacao <> 'RASCUNHO' AND p.numero IS NOT NULL
+              AND (p.unidade_autora_id = ? OR pr.unidade_origem_id = ?)
+            ORDER BY p.id DESC""", (unidade_id, unidade_id),
+    ).fetchall()
+
+    resultado = []
+    for (pid, tipo, subtipo, numero, ano, ementa, regime, situacao,
+         finalidade, despacho, despacho_data, processo_id,
+         situacao_processo, localizacao, prazo_pendente, alvo) in linhas:
+        pareceres = comissoes.pareceres(banco, pid)
+        alertas, acoes = [], []
+
+        if situacao_processo == "ARQUIVADO" and situacao != "RETIRADA":
+            alertas.append({
+                "tipo": "ARQUIVADA",
+                "mensagem": "Processo arquivado — cabe requerimento de "
+                            "desarquivamento (arts. 111-113)"})
+        if prazo_pendente and prazo_pendente < referencia:
+            alertas.append({
+                "tipo": "PRAZO_VENCIDO",
+                "mensagem": f"Parada em {localizacao} com prazo vencido "
+                            f"desde {prazo_pendente}"})
+        for parecer in pareceres:
+            if parecer["tipo"] in ("CONTRARIO", "PELA_REJEICAO") and \
+                    parecer["situacao"] != "REJEITADO":
+                alertas.append({
+                    "tipo": "PARECER_CONTRARIO",
+                    "mensagem": f"{parecer['comissao']}: parecer "
+                                f"{parecer['tipo'].lower()} "
+                                f"({parecer['situacao'].lower()})"})
+
+        if not finalidade:  # requerimento derivado não deriva outro
+            if situacao_processo == "ARQUIVADO":
+                acoes.append("DESARQUIVAMENTO")
+            elif situacao == "EM_TRAMITACAO" and \
+                    situacao_processo != "CONCLUIDO":
+                acoes.append("RETIRADA")
+                if not comissoes.exige_parecer(tipo) or \
+                        comissoes.tem_parecer_aprovado(banco, pid):
+                    acoes.append("INCLUSAO_PAUTA")
+
+        pendentes = [
+            f"REQUERIMENTO {n}/{a} ({f})"
+            for n, a, f in banco.execute(
+                "SELECT numero, ano, finalidade FROM proposicao "
+                "WHERE proposicao_alvo_id = ? AND situacao = "
+                "'EM_TRAMITACAO'", (pid,),
+            )
+        ]
+
+        resultado.append({
+            "id": pid, "rotulo": f"{tipo} {numero}/{ano}", "tipo": tipo,
+            "subtipo": subtipo, "ementa": ementa, "regime": regime,
+            "situacao": situacao, "situacao_processo": situacao_processo,
+            "localizacao": localizacao, "pareceres": pareceres,
+            "alertas": alertas, "acoes_possiveis": acoes,
+            "finalidade": finalidade, "alvo": alvo, "despacho": despacho,
+            "despacho_data": despacho_data,
+            "requerimentos_pendentes": pendentes,
+        })
+    return resultado
+
+
 def convocar_sessao(banco: sqlite3.Connection, tipo: str, data: str) -> tuple[int, int]:
     """Convoca sessão numerada sequencialmente por tipo/ano. Devolve (id, número)."""
     ano = data[:4]
@@ -474,6 +811,11 @@ def votar(
         "UPDATE proposicao SET situacao = ? WHERE id = ?",
         (resultado, proposicao_id),
     )
+    # Requerimento derivado aprovado em Plenário (arts. 111-113) aplica o
+    # efeito sobre a matéria alvo (retirada/desarquivamento). Proposições
+    # comuns não têm finalidade e a chamada é um no-op.
+    if resultado == "APROVADA":
+        _aplicar_efeito_requerimento(banco, proposicao_id)
     return resultado
 
 

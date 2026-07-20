@@ -44,6 +44,9 @@ def criar_banco(caminho: str = ":memory:",
             if vazio:
                 conexao.executescript(gerar())
                 conexao.executescript(bancodados.SETVAL_POS_SEED)
+            # Migrações idempotentes: banco criado por versão anterior do
+            # schema ganha as colunas/ações novas sem perder dados.
+            conexao.executescript(bancodados.MIGRACOES_PG)
             conexao.commit()
             return conexao
         except Exception as erro:
@@ -77,6 +80,18 @@ def criar_banco(caminho: str = ":memory:",
     if not ja_iniciado:
         conexao.executescript((RAIZ / "schema.sql").read_text())
         conexao.executescript(gerar())
+    else:
+        # Arquivo criado por versão anterior do schema: aplica as
+        # migrações (colunas novas de proposicao e ação DESPACHAR).
+        existentes = {linha[1] for linha in conexao.execute(
+            "PRAGMA table_info(proposicao)")}
+        for coluna, ddl in bancodados.COLUNAS_NOVAS_PROPOSICAO:
+            if coluna not in existentes:
+                conexao.execute(
+                    f"ALTER TABLE proposicao ADD COLUMN {coluna} {ddl}")
+        conexao.execute(
+            "INSERT OR IGNORE INTO unidade_acao (unidade_id, acao) "
+            "SELECT id, 'DESPACHAR' FROM unidade WHERE nome = 'Presidência'")
     return conexao
 
 

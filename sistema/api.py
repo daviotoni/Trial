@@ -65,6 +65,11 @@ class Recurso404(Exception):
     pass
 
 
+def _hoje() -> str:
+    from datetime import date
+    return date.today().isoformat()
+
+
 class Aplicacao:
     """Rotas e acesso ao banco (uma conexão SQLite protegida por lock)."""
 
@@ -460,6 +465,37 @@ class Aplicacao:
         self.banco.commit()
         return {"id": rascunho_id, "rotulo": rotulo}
 
+    # ------------- gabinete: acompanhamento e requerimentos ----------
+
+    def acompanhamento(self, dados):
+        """Acompanhamento rico das proposições do setor (Bloco 4)."""
+        referencia = self.query_atual.get("referencia", [""])[0] or \
+            dados.get("referencia") or _hoje()
+        return legislativo.acompanhamento_do_gabinete(
+            self.banco, self._unidade_do_usuario(), referencia)
+
+    def requerimento_derivado(self, proposicao_alvo_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
+        rid, rotulo = legislativo.requerimento_derivado(
+            self.banco, self._unidade_do_usuario(), proposicao_alvo_id,
+            dados["finalidade"], dados.get("data") or _hoje(),
+            dados.get("justificativa", ""))
+        self.banco.commit()
+        return {"id": rid, "rotulo": rotulo}
+
+    def despachos_pendentes(self):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual, "DESPACHAR")
+        return legislativo.despachos_pendentes(self.banco)
+
+    def despachar_requerimento(self, requerimento_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual, "DESPACHAR")
+        resultado = legislativo.despachar_requerimento(
+            self.banco, requerimento_id, dados["resultado"],
+            dados.get("data") or _hoje(), dados.get("texto"))
+        self.banco.commit()
+        return {"id": requerimento_id, "resultado": resultado}
+
     def apresentar_do_setor(self, dados):
         """O setor (ex.: gabinete) apresenta uma proposição de autoria própria.
 
@@ -712,6 +748,14 @@ ROTAS = [
      lambda app, m, d: app.apresentar_do_setor(d)),
     ("GET", r"^/tipos-proposicao$", None,
      lambda app, m, d: app.tipos_proposicao()),
+    ("GET", r"^/acompanhamento$", "*",
+     lambda app, m, d: app.acompanhamento(d)),
+    ("POST", r"^/proposicoes/(\d+)/requerimentos$", "LEGISLATIVO",
+     lambda app, m, d: app.requerimento_derivado(int(m.group(1)), d)),
+    ("GET", r"^/despachos-pendentes$", "LEGISLATIVO",
+     lambda app, m, d: app.despachos_pendentes()),
+    ("POST", r"^/requerimentos/(\d+)/despacho$", "LEGISLATIVO",
+     lambda app, m, d: app.despachar_requerimento(int(m.group(1)), d)),
     ("GET", r"^/rascunhos$", "*", lambda app, m, d: app.listar_rascunhos()),
     ("POST", r"^/rascunhos$", "LEGISLATIVO",
      lambda app, m, d: app.criar_rascunho(d)),

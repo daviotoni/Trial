@@ -78,6 +78,7 @@
   <button data-aba="caixa" data-area="__login">Minha caixa</button>
   <button data-aba="proposicoes-setor" data-area="__login">Minhas proposições</button>
   <button data-aba="nova-proposicao" data-area="acao:APRESENTAR_PROPOSICAO">Nova proposição</button>
+  <button data-aba="despachos" data-area="acao:DESPACHAR">Despachos</button>
   <button data-aba="cargos" data-area="PESSOAL">Cargos e vagas</button>
   <button data-aba="protocolo" data-area="PROTOCOLO">Protocolo</button>
   <button data-aba="plenario" data-area="LEGISLATIVO">Plenário</button>
@@ -107,12 +108,31 @@
 <section id="proposicoes-setor">
   <div class="cartao">
     <h2>Minhas proposições <small id="prop-setor" style="font-weight:normal"></small></h2>
-    <p style="color:#555">Todas as proposições que o seu setor apresentou — e onde cada uma está agora, mesmo já encaminhada.</p>
+    <p style="color:#555">Acompanhamento de tudo o que o seu setor apresentou: onde cada matéria
+      está, pareceres, <b>alertas</b> (arquivamento, prazo vencido, parecer contrário) e os
+      <b>requerimentos</b> que cabem em cada situação (retirada, inclusão em pauta,
+      desarquivamento — arts. 107–113 do Regimento).</p>
     <p id="prop-vazia" style="display:none"></p>
     <table id="tabela-proposicoes" style="display:none">
-      <thead><tr><th>Proposição</th><th>Assunto</th><th>Situação</th><th>Onde está agora</th></tr></thead>
+      <thead><tr><th>Proposição</th><th>Ementa</th><th>Situação</th><th>Onde está</th><th>Alertas e pareceres</th><th>Ações</th></tr></thead>
       <tbody></tbody>
     </table>
+    <p id="msg-prop" class="msg"></p>
+  </div>
+</section>
+
+<section id="despachos">
+  <div class="cartao">
+    <h2>Despachos do Presidente</h2>
+    <p style="color:#555">Requerimentos sujeitos a <b>despacho do Presidente</b> (arts. 108–110 do
+      Regimento). O deferimento aplica o efeito pedido — por exemplo, a retirada da proposição.
+      Requerimentos de deliberação vão ao Plenário, não aparecem aqui.</p>
+    <p id="despachos-vazio" style="display:none; color:#555">Nenhum requerimento aguardando despacho.</p>
+    <table id="tabela-despachos" style="display:none">
+      <thead><tr><th>Requerimento</th><th>Pedido</th><th>Autor</th><th>Justificativa</th><th>Decisão</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="msg-despacho" class="msg"></p>
   </div>
 </section>
 
@@ -459,8 +479,29 @@ const carregarCaixa = async () => {
 
 const SIT_ROTULO = {
   EM_TRAMITACAO: "Em tramitação", SOBRESTADO: "Sobrestado",
-  ARQUIVADO: "Arquivado", CONCLUIDO: "Concluído",
+  ARQUIVADO: "Arquivado", CONCLUIDO: "Concluído", RETIRADA: "Retirada",
+  APROVADA: "Aprovada", REJEITADA: "Rejeitada",
+  DEFERIDO: "Deferido", INDEFERIDO: "Indeferido",
 };
+const FINALIDADE_ROTULO = {
+  RETIRADA: "Pedir retirada",
+  INCLUSAO_PAUTA: "Pedir inclusão em pauta",
+  DESARQUIVAMENTO: "Pedir desarquivamento",
+};
+
+// Requerimento derivado (arts. 107-113): pede a justificativa e protocola.
+const pedirRequerimento = async (proposicaoId, finalidade) => {
+  const justificativa = prompt(
+    `${FINALIDADE_ROTULO[finalidade]} — justificativa (obrigatória, art. 88, §4º):`);
+  if (justificativa === null) return;
+  try {
+    const r = await enviar(`/proposicoes/${proposicaoId}/requerimentos`,
+                           {finalidade, justificativa});
+    mostrar("msg-prop", `${r.rotulo} protocolado.`, "ok");
+    carregarProposicoes(); carregarCaixa();
+  } catch (e) { mostrar("msg-prop", e.message, "erro"); }
+};
+
 const carregarProposicoes = async () => {
   const tabela = document.getElementById("tabela-proposicoes");
   const corpo = tabela.querySelector("tbody");
@@ -473,25 +514,105 @@ const carregarProposicoes = async () => {
     return;
   }
   try {
-    const lista = await consultar("/minhas-proposicoes");
+    let lista = await consultar("/acompanhamento");
     corpo.innerHTML = "";
     if (!lista.length) {
-      tabela.style.display = "none"; vazia.style.display = "";
-      vazia.textContent = "Este setor ainda não apresentou proposições.";
+      // Setor sem proposições: mostra os processos que ele autuou (visão antiga).
+      const procs = await consultar("/minhas-proposicoes");
+      if (!procs.length) {
+        tabela.style.display = "none"; vazia.style.display = "";
+        vazia.textContent = "Este setor ainda não apresentou proposições.";
+        return;
+      }
+      vazia.style.display = "none"; tabela.style.display = "";
+      procs.forEach(p => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${p.proposicao || "Processo " + p.numero}</td>` +
+          `<td>${p.assunto}</td><td>${SIT_ROTULO[p.situacao] || p.situacao}</td>` +
+          `<td><strong>${p.localizacao || "—"}</strong></td><td>—</td><td></td>`;
+        corpo.appendChild(tr);
+      });
       return;
     }
     vazia.style.display = "none"; tabela.style.display = "";
+    const podeRequerer = JSON.parse(localStorage.getItem("acoes") || "[]")
+      .includes("APRESENTAR_PROPOSICAO");
     lista.forEach(p => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${p.proposicao || "Processo " + p.numero}</td>` +
-        `<td>${p.assunto}</td>` +
-        `<td>${SIT_ROTULO[p.situacao] || p.situacao}</td>` +
-        `<td><strong>${p.localizacao || "—"}</strong></td>`;
+      const avisos = [];
+      p.alertas.forEach(a => avisos.push(
+        `<span style="color:#a33">⚠ ${a.mensagem}</span>`));
+      p.pareceres.forEach(par => avisos.push(
+        `${par.comissao}: ${par.tipo.toLowerCase()} (${par.situacao.toLowerCase()})`));
+      p.requerimentos_pendentes.forEach(r => avisos.push(`Pendente: ${r}`));
+      if (p.finalidade) avisos.push(
+        `Sobre ${p.alvo}` + (p.despacho ? ` — despacho: ${p.despacho}` : ""));
+      let situacao = SIT_ROTULO[p.situacao] || p.situacao;
+      if (p.situacao_processo === "ARQUIVADO" && p.situacao !== "RETIRADA")
+        situacao += " (processo arquivado)";
+      tr.innerHTML = `<td>${p.rotulo}</td><td>${p.ementa}</td>` +
+        `<td>${situacao}</td><td><strong>${p.localizacao || "—"}</strong></td>` +
+        `<td>${avisos.join("<br>") || "—"}</td><td></td>`;
+      if (podeRequerer) {
+        p.acoes_possiveis.forEach(f => {
+          const b = document.createElement("button");
+          b.className = "acao"; b.style.display = "block";
+          b.style.marginBottom = "4px";
+          b.textContent = FINALIDADE_ROTULO[f];
+          b.addEventListener("click", () => pedirRequerimento(p.id, f));
+          tr.lastChild.appendChild(b);
+        });
+      }
       corpo.appendChild(tr);
     });
   } catch (e) {
     tabela.style.display = "none"; vazia.style.display = "";
     vazia.textContent = e.message;
+  }
+};
+
+// Despachos do Presidente (arts. 108-110)
+const carregarDespachos = async () => {
+  const tabela = document.getElementById("tabela-despachos");
+  const corpo = tabela.querySelector("tbody");
+  const vazio = document.getElementById("despachos-vazio");
+  try {
+    const lista = await consultar("/despachos-pendentes");
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazio.style.display = ""; return;
+    }
+    vazio.style.display = "none"; tabela.style.display = "";
+    lista.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${r.rotulo}</td>` +
+        `<td>${r.ementa}${r.alvo ? "" : ""}</td>` +
+        `<td>${r.autor || r.gabinete || "—"}</td>` +
+        `<td>${r.justificativa || "—"}</td><td></td>`;
+      [["DEFERIDO", "Deferir"], ["INDEFERIDO", "Indeferir"]].forEach(
+        ([resultado, rotulo]) => {
+          const b = document.createElement("button");
+          b.className = "acao"; b.style.marginRight = "6px";
+          if (resultado === "INDEFERIDO") b.style.background = "#666";
+          b.textContent = rotulo;
+          b.addEventListener("click", async () => {
+            const texto = prompt(`Teor do despacho (${rotulo.toLowerCase()}):`,
+                                 rotulo === "Deferir" ? "Defiro." : "Indefiro.");
+            if (texto === null) return;
+            try {
+              await enviar(`/requerimentos/${r.id}/despacho`,
+                           {resultado, texto});
+              mostrar("msg-despacho", `${r.rotulo}: ${resultado.toLowerCase()}.`, "ok");
+              carregarDespachos();
+            } catch (e) { mostrar("msg-despacho", e.message, "erro"); }
+          });
+          tr.lastChild.appendChild(b);
+        });
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazio.style.display = "";
+    vazio.textContent = e.message;
   }
 };
 
@@ -757,6 +878,9 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   if (aba === "usuarios") { carregarUnidadesUsuario(); carregarUsuarios(); }
   // Catálogo regimental e rascunhos ao abrir a aba Nova proposição.
   if (aba === "nova-proposicao") { carregarCatalogoNP(); carregarRascunhos(); }
+  // Acompanhamento sempre fresco; despachos pendentes da Presidência.
+  if (aba === "proposicoes-setor") carregarProposicoes();
+  if (aba === "despachos") carregarDespachos();
 });
 
 // Painel

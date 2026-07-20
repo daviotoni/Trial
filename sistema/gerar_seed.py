@@ -97,7 +97,9 @@ UNIDADE_AREAS = {
 # Ações legislativas específicas e quem pode praticá-las (trava fina por
 # competência). Os gabinetes recebem APRESENTAR_PROPOSICAO à parte (loop).
 UNIDADE_ACOES = {
-    "Presidência": ["CONVOCAR_SESSAO", "PAUTAR"],
+    # DESPACHAR: requerimentos sujeitos a despacho do Presidente
+    # (arts. 108-110 do Regimento Interno).
+    "Presidência": ["CONVOCAR_SESSAO", "PAUTAR", "DESPACHAR"],
     "Mesa Diretora": ["CONVOCAR_SESSAO", "APRESENTAR_PROPOSICAO"],
     "Diretoria de Plenário": ["PAUTAR"],
     # Setor único de comissões: recebe as matérias e emite os pareceres,
