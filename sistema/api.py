@@ -748,21 +748,42 @@ class Aplicacao:
         """Lista as comissões temáticas (para marcar o parecer)."""
         return comissoes.comissoes(self.banco)
 
+    def materias_para_parecer(self):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "EMITIR_PARECER")
+        return comissoes.materias_para_parecer(self.banco)
+
+    def pareceres_por_comissao(self):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "EMITIR_PARECER")
+        comissao = self.query_atual.get("comissao", [None])[0]
+        return comissoes.pareceres_por_comissao(
+            self.banco, int(comissao) if comissao else None)
+
     def emitir_parecer(self, proposicao_id: int, dados):
         autenticacao.exigir_acao(self.banco, self.usuario_atual,
                                  "EMITIR_PARECER")
         pid = comissoes.emitir_parecer(
             self.banco, proposicao_id, dados["comissao"], dados["tipo"],
-            dados["ementa"], dados["data"],
+            dados["ementa"], dados.get("data") or _hoje(),
             dados.get("relator_parlamentar_id"), dados.get("prazo"),
         )
         self.banco.commit()
         return {"id": pid}
 
     def aprovar_parecer(self, parecer_id: int):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "EMITIR_PARECER")
         comissoes.aprovar_parecer(self.banco, parecer_id)
         self.banco.commit()
         return {"id": parecer_id, "situacao": "APROVADO"}
+
+    def rejeitar_parecer(self, parecer_id: int):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "EMITIR_PARECER")
+        comissoes.rejeitar_parecer(self.banco, parecer_id)
+        self.banco.commit()
+        return {"id": parecer_id, "situacao": "REJEITADO"}
 
     def pareceres(self, proposicao_id: int):
         return comissoes.pareceres(self.banco, proposicao_id)
@@ -977,10 +998,16 @@ ROTAS = [
     ("GET", r"^/sessoes/(\d+)/votacoes/(\d+)$", None,
      lambda app, m, d: app.placar(int(m.group(1)), int(m.group(2)))),
     ("GET", r"^/comissoes$", None, lambda app, m, d: app.comissoes()),
+    ("GET", r"^/materias-parecer$", "LEGISLATIVO",
+     lambda app, m, d: app.materias_para_parecer()),
+    ("GET", r"^/pareceres$", "LEGISLATIVO",
+     lambda app, m, d: app.pareceres_por_comissao()),
     ("POST", r"^/proposicoes/(\d+)/pareceres$", "LEGISLATIVO",
      lambda app, m, d: app.emitir_parecer(int(m.group(1)), d)),
     ("POST", r"^/pareceres/(\d+)/aprovacao$", "LEGISLATIVO",
      lambda app, m, d: app.aprovar_parecer(int(m.group(1)))),
+    ("POST", r"^/pareceres/(\d+)/rejeicao$", "LEGISLATIVO",
+     lambda app, m, d: app.rejeitar_parecer(int(m.group(1)))),
     ("GET", r"^/proposicoes/(\d+)/pareceres$", None,
      lambda app, m, d: app.pareceres(int(m.group(1)))),
     ("POST", r"^/fornecedores$", "COMPRAS",

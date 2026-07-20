@@ -95,6 +95,10 @@ def criar_banco(caminho: str = ":memory:",
         # Gestão de acessos é exclusiva do admin: remove a área USUARIOS
         # de qualquer setor (a TI a possuía).
         conexao.execute("DELETE FROM unidade_area WHERE area = 'USUARIOS'")
+        # Setor único de comissões renomeado para "Comissões Permanentes".
+        conexao.execute(
+            "UPDATE unidade SET nome = 'Comissões Permanentes' "
+            "WHERE nome = 'Assistência às Comissões Permanentes'")
         for tabela, ddl in bancodados.TABELAS_NOVAS_SQLITE.items():
             existe = conexao.execute(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' "

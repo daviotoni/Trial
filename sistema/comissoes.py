@@ -138,6 +138,62 @@ def exige_parecer(tipo_proposicao: str) -> bool:
     return tipo_proposicao in TIPOS_QUE_EXIGEM_PARECER
 
 
+def materias_para_parecer(banco: sqlite3.Connection) -> list[dict]:
+    """Matérias de mérito aguardando parecer de comissão (art. 33).
+
+    Proposições de mérito (PL, PLC, PDL, PR) em tramitação que ainda não
+    têm parecer aprovado — a fila de trabalho do setor de comissões.
+    Traz os pareceres já emitidos (para aprovar/rejeitar).
+    """
+    tipos = ", ".join(f"'{t}'" for t in sorted(TIPOS_QUE_EXIGEM_PARECER))
+    return [
+        {"id": pid, "rotulo": f"{tipo} {numero}/{ano}", "tipo": tipo,
+         "ementa": ementa, "autor": autor,
+         "pareceres": pareceres(banco, pid)}
+        for (pid, tipo, numero, ano, ementa, autor) in banco.execute(
+            f"""SELECT p.id, p.tipo, p.numero, p.ano, p.ementa, pl.nome
+                  FROM proposicao p
+                  LEFT JOIN parlamentar pl ON pl.id = p.autor_parlamentar_id
+                 WHERE p.situacao = 'EM_TRAMITACAO' AND p.numero IS NOT NULL
+                   AND p.tipo IN ({tipos})
+                   AND NOT EXISTS (SELECT 1 FROM parecer pa
+                                    WHERE pa.proposicao_id = p.id
+                                      AND pa.situacao = 'APROVADO')
+                 ORDER BY p.id""",
+        )
+    ]
+
+
+def pareceres_por_comissao(banco: sqlite3.Connection,
+                           comissao_id: int | None = None) -> list[dict]:
+    """Pareceres do setor, individualizados pela comissão temática.
+
+    Sem `comissao_id`, lista todos; com ele, filtra pela comissão — o
+    "identificar a qual comissão cada parecer está vinculado" dentro do
+    setor único de Comissões Permanentes.
+    """
+    condicao = "WHERE pa.comissao_id = ?" if comissao_id else ""
+    args = (comissao_id,) if comissao_id else ()
+    return [
+        {"id": pid, "comissao": comissao, "comissao_id": cid,
+         "proposicao": f"{tipo} {numero}/{ano}", "proposicao_id": prop_id,
+         "tipo": tipo_parecer, "ementa": ementa, "situacao": situacao,
+         "relator": relator, "emitido_em": emitido_em}
+        for (pid, comissao, cid, tipo, numero, ano, prop_id, tipo_parecer,
+             ementa, situacao, relator, emitido_em) in banco.execute(
+            f"""SELECT pa.id, c.nome, c.id, p.tipo, p.numero, p.ano, p.id,
+                       pa.tipo, pa.ementa, pa.situacao, pl.nome, pa.emitido_em
+                  FROM parecer pa
+                  JOIN comissao_permanente c ON c.id = pa.comissao_id
+                  JOIN proposicao p ON p.id = pa.proposicao_id
+                  LEFT JOIN parlamentar pl
+                         ON pl.id = pa.relator_parlamentar_id
+                  {condicao}
+                 ORDER BY c.nome, pa.id DESC""", args,
+        )
+    ]
+
+
 def pareceres(banco: sqlite3.Connection, proposicao_id: int) -> list[dict]:
     """Lista os pareceres da proposição, com a comissão marcada e o relator."""
     return [

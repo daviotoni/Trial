@@ -190,7 +190,7 @@ class TestRecusa(unittest.TestCase):
             "SELECT id FROM unidade WHERE nome = 'Presidência'").fetchone()[0]
         comissoes = app.banco.execute(
             "SELECT id FROM unidade WHERE nome = "
-            "'Assistência às Comissões Permanentes'").fetchone()[0]
+            "'Comissões Permanentes'").fetchone()[0]
 
         # gabinete não recusa (só Presidência despacha)
         app.usuario_atual = gabinete

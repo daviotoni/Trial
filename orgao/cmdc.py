@@ -173,7 +173,7 @@ ASSESSORAMENTO_PARLAMENTAR = [
     "Assessoria de Gabinete Parlamentar",
     "Assessoria Especial da Presidência",
     "Assessores Parlamentares",
-    "Assistência às Comissões Permanentes",
+    "Comissões Permanentes",
 ]
 
 # 4º grau — Serviços Auxiliares.

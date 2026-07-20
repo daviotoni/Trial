@@ -80,6 +80,7 @@
   <button data-aba="nova-proposicao" data-area="acao:APRESENTAR_PROPOSICAO">Nova proposição</button>
   <button data-aba="emendar" data-area="acao:APRESENTAR_PROPOSICAO">Emendar</button>
   <button data-aba="despachos" data-area="acao:DESPACHAR">Despachos</button>
+  <button data-aba="comissoes" data-area="acao:EMITIR_PARECER">Comissões</button>
   <button data-aba="recursos" data-area="acao:EMITIR_PARECER">Recursos (CLJRF)</button>
   <button data-aba="cargos" data-area="PESSOAL">Cargos e vagas</button>
   <button data-aba="protocolo" data-area="PROTOCOLO">Protocolo</button>
@@ -175,6 +176,51 @@
       <tbody></tbody>
     </table>
     <p id="msg-recebimento" class="msg"></p>
+  </div>
+</section>
+
+<section id="comissoes">
+  <div class="cartao">
+    <h2>Comissões Permanentes</h2>
+    <p style="color:#555">Setor único que recebe as matérias e emite os pareceres das comissões
+      permanentes temáticas (art. 33 do Regimento). Cada parecer é <b>marcado com a comissão</b>
+      a que corresponde — preserva-se a centralização do setor com a individualização por comissão.</p>
+  </div>
+  <div class="cartao">
+    <h3 style="margin-top:0">Emitir parecer</h3>
+    <label>Matéria</label>
+    <select id="pc-materia"></select>
+    <label>Comissão temática</label>
+    <select id="pc-comissao"></select>
+    <label>Sentido do parecer</label>
+    <select id="pc-tipo">
+      <option value="FAVORAVEL">Favorável</option>
+      <option value="FAVORAVEL_COM_EMENDAS">Favorável com emendas</option>
+      <option value="CONTRARIO">Contrário</option>
+      <option value="PELA_REJEICAO">Pela rejeição</option>
+    </select>
+    <label>Ementa do parecer</label>
+    <textarea id="pc-ementa" rows="2" placeholder="Conclusão do parecer."></textarea>
+    <button class="acao" id="btn-emitir-parecer">Emitir parecer</button>
+    <p id="msg-parecer" class="msg"></p>
+  </div>
+  <div class="cartao">
+    <h3 style="margin-top:0">Matérias aguardando parecer</h3>
+    <p id="materias-vazio" style="display:none; color:#555">Nenhuma matéria aguardando parecer.</p>
+    <table id="tabela-materias" style="display:none">
+      <thead><tr><th>Matéria</th><th>Ementa</th><th>Pareceres emitidos</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="cartao">
+    <h3 style="margin-top:0">Pareceres por comissão</h3>
+    <label>Filtrar por comissão</label>
+    <select id="pc-filtro"><option value="">Todas as comissões</option></select>
+    <table id="tabela-pareceres" style="display:none; margin-top:8px">
+      <thead><tr><th>Comissão</th><th>Matéria</th><th>Sentido</th><th>Situação</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="pareceres-vazio" style="display:none; color:#555">Nenhum parecer registrado.</p>
   </div>
 </section>
 
@@ -711,6 +757,127 @@ document.getElementById("btn-apresentar-emenda").addEventListener("click", async
   } catch (e) { mostrar("msg-emenda", e.message, "erro"); }
 });
 
+// Setor de Comissões Permanentes (art. 33) — pareceres por comissão
+let _comissoesTematicas = null;
+const comissoesTematicas = async () => {
+  if (_comissoesTematicas === null)
+    _comissoesTematicas = await consultar("/comissoes");
+  return _comissoesTematicas;
+};
+const PARECER_ROTULO = {
+  FAVORAVEL: "Favorável", FAVORAVEL_COM_EMENDAS: "Favorável c/ emendas",
+  CONTRARIO: "Contrário", PELA_REJEICAO: "Pela rejeição",
+};
+
+const carregarComissoes = async () => {
+  const comissoes = await comissoesTematicas();
+  const opcoes = comissoes.map(
+    c => `<option value="${c.id}">${c.nome}</option>`).join("");
+  document.getElementById("pc-comissao").innerHTML = opcoes;
+  document.getElementById("pc-filtro").innerHTML =
+    '<option value="">Todas as comissões</option>' + opcoes;
+  await carregarMaterias();
+  await carregarPareceresPorComissao();
+};
+
+const carregarMaterias = async () => {
+  const sel = document.getElementById("pc-materia");
+  const tabela = document.getElementById("tabela-materias");
+  const corpo = tabela.querySelector("tbody");
+  const vazio = document.getElementById("materias-vazio");
+  try {
+    const lista = await consultar("/materias-parecer");
+    sel.innerHTML = lista.length
+      ? lista.map(m => `<option value="${m.id}">${m.rotulo} — ${m.ementa}</option>`).join("")
+      : '<option value="">(nenhuma matéria)</option>';
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazio.style.display = ""; return;
+    }
+    vazio.style.display = "none"; tabela.style.display = "";
+    lista.forEach(m => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${m.rotulo}</td><td>${m.ementa}</td><td></td>`;
+      const cel = tr.lastChild;
+      if (!m.pareceres.length) cel.textContent = "—";
+      m.pareceres.forEach(par => {
+        const div = document.createElement("div");
+        div.style.marginBottom = "4px";
+        div.textContent = `${par.comissao}: ` +
+          `${PARECER_ROTULO[par.tipo] || par.tipo} (${par.situacao.toLowerCase()}) `;
+        if (par.situacao === "EMITIDO") {
+          const ap = document.createElement("button");
+          ap.className = "acao"; ap.textContent = "Aprovar";
+          ap.style.marginRight = "4px";
+          ap.addEventListener("click", () => decidirParecer(par.id, "aprovacao"));
+          const rj = document.createElement("button");
+          rj.className = "acao"; rj.style.background = "#666";
+          rj.textContent = "Rejeitar";
+          rj.addEventListener("click", () => decidirParecer(par.id, "rejeicao"));
+          div.appendChild(ap); div.appendChild(rj);
+        }
+        cel.appendChild(div);
+      });
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazio.style.display = "";
+    vazio.textContent = e.message;
+  }
+};
+
+const decidirParecer = async (id, acao) => {
+  try {
+    await enviar(`/pareceres/${id}/${acao}`, {});
+    mostrar("msg-parecer",
+      acao === "aprovacao" ? "Parecer aprovado." : "Parecer rejeitado.", "ok");
+    carregarMaterias(); carregarPareceresPorComissao();
+  } catch (e) { mostrar("msg-parecer", e.message, "erro"); }
+};
+
+const carregarPareceresPorComissao = async () => {
+  const filtro = document.getElementById("pc-filtro").value;
+  const tabela = document.getElementById("tabela-pareceres");
+  const corpo = tabela.querySelector("tbody");
+  const vazio = document.getElementById("pareceres-vazio");
+  try {
+    const lista = await consultar(
+      `/pareceres${filtro ? `?comissao=${filtro}` : ""}`);
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazio.style.display = ""; return;
+    }
+    vazio.style.display = "none"; tabela.style.display = "";
+    lista.forEach(p => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${p.comissao}</td><td>${p.proposicao}</td>` +
+        `<td>${PARECER_ROTULO[p.tipo] || p.tipo}</td>` +
+        `<td>${p.situacao.toLowerCase()}</td>`;
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazio.style.display = "";
+    vazio.textContent = e.message;
+  }
+};
+
+document.getElementById("btn-emitir-parecer").addEventListener("click", async () => {
+  const materia = document.getElementById("pc-materia").value;
+  if (!materia) { mostrar("msg-parecer", "Não há matéria selecionada.", "erro"); return; }
+  try {
+    await enviar(`/proposicoes/${materia}/pareceres`, {
+      comissao: parseInt(document.getElementById("pc-comissao").value, 10),
+      tipo: document.getElementById("pc-tipo").value,
+      ementa: document.getElementById("pc-ementa").value,
+    });
+    document.getElementById("pc-ementa").value = "";
+    mostrar("msg-parecer", "Parecer emitido.", "ok");
+    carregarMaterias(); carregarPareceresPorComissao();
+  } catch (e) { mostrar("msg-parecer", e.message, "erro"); }
+});
+document.getElementById("pc-filtro")
+  .addEventListener("change", carregarPareceresPorComissao);
+
 // Recebimento/recusa da Presidência (art. 88, §1º)
 const carregarRecebimento = async () => {
   const tabela = document.getElementById("tabela-recebimento");
@@ -1171,6 +1338,7 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   if (aba === "despachos") { carregarDespachos(); carregarRecebimento(); }
   if (aba === "emendar") carregarEmendaveis();
   if (aba === "recursos") carregarRecursos();
+  if (aba === "comissoes") carregarComissoes();
 });
 
 // Painel

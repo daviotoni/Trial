@@ -25,7 +25,7 @@ INSERT INTO unidade (id, nome, sigla, grau, tipo, unidade_pai_id, norma_id, vige
   (18, 'Assessoria de Gabinete Parlamentar', NULL, 3, 'ASSESSORAMENTO', 3, 1, '2025-09-01'),
   (19, 'Assessoria Especial da Presidência', NULL, 3, 'ASSESSORAMENTO', 3, 1, '2025-09-01'),
   (20, 'Assessores Parlamentares', NULL, 3, 'ASSESSORAMENTO', 3, 1, '2025-09-01'),
-  (21, 'Assistência às Comissões Permanentes', NULL, 3, 'ASSESSORAMENTO', 3, 1, '2025-09-01'),
+  (21, 'Comissões Permanentes', NULL, 3, 'ASSESSORAMENTO', 3, 1, '2025-09-01'),
   (22, 'Coordenadoria de Apoio Legislativo', NULL, 2, 'COORDENADORIA', 17, 1, '2025-09-01'),
   (23, 'Coordenadoria de Assuntos de Plenário', NULL, 2, 'COORDENADORIA', 17, 1, '2025-09-01'),
   (24, 'Coordenadoria de Atas e Projetos', NULL, 2, 'COORDENADORIA', 17, 1, '2025-09-01'),

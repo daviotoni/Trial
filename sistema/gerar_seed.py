@@ -59,7 +59,7 @@ UNIDADE_AREAS = {
     "Coordenadoria de Apoio Legislativo": ["LEGISLATIVO"],
     "Coordenadoria de Assuntos de Plenário": ["LEGISLATIVO"],
     "Coordenadoria de Atas e Projetos": ["LEGISLATIVO"],
-    "Assistência às Comissões Permanentes": ["LEGISLATIVO"],
+    "Comissões Permanentes": ["LEGISLATIVO"],
     # A TI zela pela infraestrutura, mas NÃO gere acessos/logins: a gestão
     # de usuários é privativa do administrador (não é área de setor).
     "Coordenadoria de Tecnologia da Informação e Comunicação": [],
@@ -106,7 +106,7 @@ UNIDADE_ACOES = {
     "Diretoria de Plenário": ["PAUTAR"],
     # Setor único de comissões: recebe as matérias e emite os pareceres,
     # marcando a comissão temática (art. 33 do Regimento Interno).
-    "Assistência às Comissões Permanentes": ["EMITIR_PARECER"],
+    "Comissões Permanentes": ["EMITIR_PARECER"],
 }
 
 RUBRICAS = [
@@ -329,7 +329,7 @@ def gerar() -> str:
          "Protocolo, autuação e numeração", 2),
         ("Consultoria-Geral Legislativa",
          "Análise de constitucionalidade e técnica legislativa", 10),
-        ("Assistência às Comissões Permanentes",
+        ("Comissões Permanentes",
          "Distribuição às comissões e coleta de pareceres", 15),
         ("Diretoria de Plenário",
          "Inclusão em Ordem do Dia e deliberação", 5),

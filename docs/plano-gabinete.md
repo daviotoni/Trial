@@ -93,6 +93,14 @@ gabinetes como unidades de assessoramento ao mandato).
   Presidente recebe ou recusa a proposição; da recusa cabe recurso do
   autor à Comissão de Legislação, Justiça e Redação Final, que mantém
   (recusa definitiva) ou reverte (matéria readmitida). Tabela `recusa`.
+- **Setor de Comissões Permanentes** (art. 33): setor único (renomeado de
+  "Assistência às Comissões Permanentes" para "Comissões Permanentes")
+  que recebe as matérias de mérito, emite pareceres **marcando a comissão
+  temática** e aprova/rejeita — centralização administrativa com
+  individualização por comissão. Tela própria (fila de parecer + visão
+  por comissão).
+- **Gestão de acessos/logins exclusiva do admin**: nenhum setor (nem a TI)
+  enxerga ou opera a gestão de usuários — só o administrador.
 
 ## Fora de escopo nesta fase (anotado para o futuro)
 
