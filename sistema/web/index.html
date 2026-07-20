@@ -78,6 +78,7 @@
   <button data-aba="caixa" data-area="__login">Minha caixa</button>
   <button data-aba="proposicoes-setor" data-area="__login">Minhas proposições</button>
   <button data-aba="nova-proposicao" data-area="acao:APRESENTAR_PROPOSICAO">Nova proposição</button>
+  <button data-aba="emendar" data-area="acao:APRESENTAR_PROPOSICAO">Emendar</button>
   <button data-aba="despachos" data-area="acao:DESPACHAR">Despachos</button>
   <button data-aba="cargos" data-area="PESSOAL">Cargos e vagas</button>
   <button data-aba="protocolo" data-area="PROTOCOLO">Protocolo</button>
@@ -118,6 +119,34 @@
       <tbody></tbody>
     </table>
     <p id="msg-prop" class="msg"></p>
+  </div>
+</section>
+
+<section id="emendar">
+  <div class="cartao">
+    <h2>Emendar matéria em tramitação</h2>
+    <p style="color:#555">Qualquer gabinete pode apresentar <b>emenda</b> a projeto de outro autor
+      (arts. 114–115 do Regimento). A emenda junta-se à matéria principal e é apreciada com ela.
+      A pertinência com a matéria é analisada pela comissão e pela Presidência.</p>
+    <p id="emendar-vazio" style="display:none; color:#555">Nenhum projeto em tramitação para emendar.</p>
+    <table id="tabela-emendaveis" style="display:none">
+      <thead><tr><th>Proposição</th><th>Ementa</th><th>Autor</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="cartao" id="form-emenda" style="display:none">
+    <h2>Nova emenda <small id="em-alvo" style="font-weight:normal"></small></h2>
+    <label>Espécie (art. 114)</label>
+    <select id="em-especie"></select>
+    <label>Texto da alteração</label>
+    <textarea id="em-texto" rows="4" placeholder="Ex.: Suprima-se o art. 2º. / Dê-se ao art. 1º a seguinte redação: ..."></textarea>
+    <label>Justificativa</label>
+    <textarea id="em-justificativa" rows="3" placeholder="Exponha as razões e a pertinência com a matéria (arts. 88, §4º, e 115)."></textarea>
+    <div style="display:flex; gap:8px">
+      <button class="acao" id="btn-apresentar-emenda">Apresentar emenda</button>
+      <button class="acao" id="btn-cancelar-emenda" style="background:#666">Cancelar</button>
+    </div>
+    <p id="msg-emenda" class="msg"></p>
   </div>
 </section>
 
@@ -549,8 +578,12 @@ const carregarProposicoes = async () => {
       p.pareceres.forEach(par => avisos.push(
         `${par.comissao}: ${par.tipo.toLowerCase()} (${par.situacao.toLowerCase()})`));
       p.requerimentos_pendentes.forEach(r => avisos.push(`Pendente: ${r}`));
+      (p.emendas || []).forEach(e => avisos.push(
+        `${e.rotulo} (${e.especie.toLowerCase()}) de ${e.autor || "—"} — ` +
+        `${SIT_ROTULO[e.situacao] || e.situacao}`));
       if (p.finalidade) avisos.push(
         `Sobre ${p.alvo}` + (p.despacho ? ` — despacho: ${p.despacho}` : ""));
+      else if (p.tipo === "EMENDA" && p.alvo) avisos.push(`Emenda ao ${p.alvo}`);
       let situacao = SIT_ROTULO[p.situacao] || p.situacao;
       if (p.situacao_processo === "ARQUIVADO" && p.situacao !== "RETIRADA")
         situacao += " (processo arquivado)";
@@ -574,6 +607,63 @@ const carregarProposicoes = async () => {
     vazia.textContent = e.message;
   }
 };
+
+// Emendas (arts. 114-115)
+let _emendaAlvo = null;
+const carregarEmendaveis = async () => {
+  const tabela = document.getElementById("tabela-emendaveis");
+  const corpo = tabela.querySelector("tbody");
+  const vazio = document.getElementById("emendar-vazio");
+  try {
+    const sel = document.getElementById("em-especie");
+    if (!sel.options.length) {
+      const tipos = await consultar("/tipos-emenda");
+      sel.innerHTML = tipos.map(
+        t => `<option value="${t.codigo}">${t.codigo} — ${t.descricao}</option>`).join("");
+    }
+    const lista = (await consultar("/proposicoes")).filter(p => p.emendavel);
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazio.style.display = ""; return;
+    }
+    vazio.style.display = "none"; tabela.style.display = "";
+    lista.forEach(p => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${p.rotulo}</td><td>${p.ementa}</td>` +
+        `<td>${p.autor || p.gabinete || "—"}</td><td></td>`;
+      const b = document.createElement("button");
+      b.className = "acao"; b.textContent = "Emendar";
+      b.addEventListener("click", () => {
+        _emendaAlvo = p;
+        document.getElementById("em-alvo").textContent = `— ${p.rotulo}: ${p.ementa}`;
+        document.getElementById("form-emenda").style.display = "";
+        document.getElementById("form-emenda").scrollIntoView({behavior: "smooth"});
+      });
+      tr.lastChild.appendChild(b);
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazio.style.display = "";
+    vazio.textContent = e.message;
+  }
+};
+document.getElementById("btn-cancelar-emenda").addEventListener("click", () => {
+  document.getElementById("form-emenda").style.display = "none"; _emendaAlvo = null;
+});
+document.getElementById("btn-apresentar-emenda").addEventListener("click", async () => {
+  if (!_emendaAlvo) return;
+  try {
+    const r = await enviar(`/proposicoes/${_emendaAlvo.id}/emendas`, {
+      especie: document.getElementById("em-especie").value,
+      texto: document.getElementById("em-texto").value,
+      justificativa: document.getElementById("em-justificativa").value,
+    });
+    mostrar("msg-emenda", `${r.rotulo} apresentada.`, "ok");
+    document.getElementById("em-texto").value = "";
+    document.getElementById("em-justificativa").value = "";
+    carregarProposicoes();
+  } catch (e) { mostrar("msg-emenda", e.message, "erro"); }
+});
 
 // Despachos do Presidente (arts. 108-110)
 const carregarDespachos = async () => {
@@ -951,6 +1041,7 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   // Acompanhamento sempre fresco; despachos pendentes da Presidência.
   if (aba === "proposicoes-setor") carregarProposicoes();
   if (aba === "despachos") carregarDespachos();
+  if (aba === "emendar") carregarEmendaveis();
 });
 
 // Painel

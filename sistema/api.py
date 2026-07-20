@@ -508,6 +508,31 @@ class Aplicacao:
         self.banco.commit()
         return {"id": rascunho_id, "rotulo": rotulo}
 
+    # ------------------- emendas (arts. 114-115) ---------------------
+
+    def tipos_emenda(self):
+        """Espécies regimentais de emenda (art. 114)."""
+        return [{"codigo": codigo, "descricao": descricao}
+                for codigo, descricao in
+                legislativo.ESPECIES_EMENDA.items()]
+
+    def listar_proposicoes(self):
+        """Proposições protocoladas (transparência ativa; tela de emendas)."""
+        return legislativo.proposicoes_protocoladas(self.banco)
+
+    def apresentar_emenda(self, proposicao_alvo_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
+        eid, rotulo = legislativo.apresentar_emenda(
+            self.banco, self._unidade_do_usuario(), proposicao_alvo_id,
+            dados["especie"], dados.get("texto", ""),
+            dados.get("justificativa", ""), dados.get("data") or _hoje())
+        self.banco.commit()
+        return {"id": eid, "rotulo": rotulo}
+
+    def emendas_da_proposicao(self, proposicao_id: int):
+        return legislativo.emendas_da_proposicao(self.banco, proposicao_id)
+
     # ------------- gabinete: acompanhamento e requerimentos ----------
 
     def acompanhamento(self, dados):
@@ -810,6 +835,13 @@ ROTAS = [
      lambda app, m, d: app.tipos_proposicao()),
     ("GET", r"^/acompanhamento$", "*",
      lambda app, m, d: app.acompanhamento(d)),
+    ("GET", r"^/proposicoes$", None,
+     lambda app, m, d: app.listar_proposicoes()),
+    ("GET", r"^/tipos-emenda$", None, lambda app, m, d: app.tipos_emenda()),
+    ("POST", r"^/proposicoes/(\d+)/emendas$", "LEGISLATIVO",
+     lambda app, m, d: app.apresentar_emenda(int(m.group(1)), d)),
+    ("GET", r"^/proposicoes/(\d+)/emendas$", None,
+     lambda app, m, d: app.emendas_da_proposicao(int(m.group(1)))),
     ("POST", r"^/proposicoes/(\d+)/requerimentos$", "LEGISLATIVO",
      lambda app, m, d: app.requerimento_derivado(int(m.group(1)), d)),
     ("GET", r"^/despachos-pendentes$", "LEGISLATIVO",

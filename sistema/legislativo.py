@@ -341,6 +341,135 @@ def protocolar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
 
 
 # ------------------------------------------------------------------
+# Bloco 3: emendas a matéria alheia (arts. 114-115 e 88, VIII)
+# ------------------------------------------------------------------
+
+# Espécies regimentais de emenda (art. 114). O SUBSTITUTIVO substitui a
+# proposição por inteiro; as demais alteram partes dela.
+ESPECIES_EMENDA = {
+    "SUPRESSIVA": "Suprime parte da proposição",
+    "SUBSTITUTIVA": "Substitui parte da proposição",
+    "ADITIVA": "Acrescenta disposição à proposição",
+    "MODIFICATIVA": "Altera a redação sem mudar a substância",
+    "SUBSTITUTIVO": "Substitui integralmente a proposição",
+}
+
+# Só projetos recebem emenda (a espécie acessória pressupõe texto
+# articulado a alterar — art. 92); indicações, moções e requerimentos não.
+TIPOS_EMENDAVEIS = {"PELO", "PLC", "PL", "PR", "PDL"}
+
+
+def apresentar_emenda(
+    banco: sqlite3.Connection,
+    unidade_id: int,
+    proposicao_alvo_id: int,
+    especie: str,
+    texto: str,
+    justificativa: str,
+    data: str,
+) -> tuple[int, str]:
+    """Apresenta emenda a uma proposição em tramitação (arts. 114-115).
+
+    Qualquer gabinete pode emendar matéria de outro (é o ponto do
+    instituto). A emenda é acessória: aponta a matéria alvo e NÃO abre
+    processo próprio — junta-se ao da principal. Texto e justificativa
+    são obrigatórios; a pertinência com a matéria (art. 115) é juízo da
+    comissão/Presidência na instrução. Devolve (id, rótulo).
+    """
+    if especie not in ESPECIES_EMENDA:
+        raise RegraViolada("espécie de emenda inválida: use "
+                           + ", ".join(ESPECIES_EMENDA))
+    if not texto or not texto.strip():
+        raise RegraViolada("a emenda exige o texto da alteração (art. 92)")
+    if not justificativa or not justificativa.strip():
+        raise RegraViolada("a justificativa é obrigatória (art. 88, §4º)")
+
+    linha = banco.execute(
+        """SELECT p.tipo, p.numero, p.ano, p.situacao,
+                  (SELECT situacao FROM processo WHERE id = p.processo_id)
+             FROM proposicao p WHERE p.id = ?""", (proposicao_alvo_id,),
+    ).fetchone()
+    if linha is None or linha[3] == "RASCUNHO" or linha[1] is None:
+        raise RegraViolada("proposição alvo inexistente ou não protocolada")
+    tipo_alvo, numero_alvo, ano_alvo, situacao_alvo, situacao_processo = linha
+    if tipo_alvo not in TIPOS_EMENDAVEIS:
+        raise RegraViolada(
+            f"{tipo_alvo} não recebe emenda — só projetos "
+            f"({', '.join(sorted(TIPOS_EMENDAVEIS))})")
+    if situacao_alvo != "EM_TRAMITACAO" or \
+            situacao_processo in ("ARQUIVADO", "CONCLUIDO"):
+        raise RegraViolada(
+            f"a proposição {tipo_alvo} {numero_alvo}/{ano_alvo} não está "
+            "em tramitação")
+
+    ano = int(data[:4])
+    (ultimo,) = banco.execute(
+        "SELECT COALESCE(MAX(numero), 0) FROM proposicao "
+        "WHERE tipo = 'EMENDA' AND ano = ?", (ano,),
+    ).fetchone()
+    numero = ultimo + 1
+    emenda_id = banco.execute(
+        "INSERT INTO proposicao (tipo, subtipo, numero, ano, ementa, "
+        "texto, justificativa, autor_parlamentar_id, unidade_autora_id, "
+        "situacao, proposicao_alvo_id) "
+        "VALUES ('EMENDA', ?, ?, ?, ?, ?, ?, ?, ?, 'EM_TRAMITACAO', ?)",
+        (especie, numero, ano,
+         f"Emenda {especie.lower()} ao {tipo_alvo} {numero_alvo}/{ano_alvo}",
+         texto.strip(), justificativa.strip(),
+         parlamentar_do_gabinete(banco, unidade_id), unidade_id,
+         proposicao_alvo_id),
+    ).lastrowid
+    return emenda_id, (f"EMENDA {numero}/{ano} ao "
+                       f"{tipo_alvo} {numero_alvo}/{ano_alvo}")
+
+
+def emendas_da_proposicao(banco: sqlite3.Connection,
+                          proposicao_id: int) -> list[dict]:
+    """Emendas apresentadas à proposição, com espécie, autor e situação."""
+    return [
+        {"id": eid, "rotulo": f"EMENDA {numero}/{ano}", "especie": especie,
+         "ementa": ementa, "texto": texto, "justificativa": justificativa,
+         "autor": autor, "gabinete": gabinete, "situacao": situacao}
+        for (eid, numero, ano, especie, ementa, texto, justificativa,
+             autor, gabinete, situacao) in banco.execute(
+            """SELECT e.id, e.numero, e.ano, e.subtipo, e.ementa, e.texto,
+                      e.justificativa, pl.nome, u.nome, e.situacao
+                 FROM proposicao e
+                 LEFT JOIN parlamentar pl ON pl.id = e.autor_parlamentar_id
+                 LEFT JOIN unidade u ON u.id = e.unidade_autora_id
+                WHERE e.tipo = 'EMENDA' AND e.proposicao_alvo_id = ?
+                ORDER BY e.id""", (proposicao_id,),
+        )
+    ]
+
+
+def proposicoes_protocoladas(banco: sqlite3.Connection) -> list[dict]:
+    """Proposições protocoladas (transparência ativa; base da tela de
+    emendas). Exclui rascunhos e as próprias emendas."""
+    return [
+        {"id": pid, "rotulo": f"{tipo} {numero}/{ano}", "tipo": tipo,
+         "ementa": ementa, "autor": autor, "gabinete": gabinete,
+         "situacao": situacao, "regime": regime,
+         "emendavel": (tipo in TIPOS_EMENDAVEIS
+                       and situacao == "EM_TRAMITACAO"
+                       and situacao_processo not in
+                       ("ARQUIVADO", "CONCLUIDO"))}
+        for (pid, tipo, numero, ano, ementa, autor, gabinete, situacao,
+             regime, situacao_processo) in banco.execute(
+            """SELECT p.id, p.tipo, p.numero, p.ano, p.ementa, pl.nome,
+                      u.nome, p.situacao, p.regime,
+                      (SELECT situacao FROM processo WHERE id = p.processo_id)
+                 FROM proposicao p
+                 LEFT JOIN parlamentar pl ON pl.id = p.autor_parlamentar_id
+                 LEFT JOIN unidade u ON u.id = p.unidade_autora_id
+                WHERE p.situacao <> 'RASCUNHO' AND p.numero IS NOT NULL
+                  AND p.tipo <> 'EMENDA'
+                ORDER BY p.id DESC""",
+        )
+    ]
+
+
+# ------------------------------------------------------------------
 # Bloco 4: requerimentos derivados, despacho do Presidente e
 # acompanhamento (arts. 90, 93-95 e 107-113 do Regimento Interno)
 # ------------------------------------------------------------------
@@ -648,18 +777,27 @@ def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
             elif situacao == "EM_TRAMITACAO" and \
                     situacao_processo != "CONCLUIDO":
                 acoes.append("RETIRADA")
-                if not comissoes.exige_parecer(tipo) or \
-                        comissoes.tem_parecer_aprovado(banco, pid):
+                # Emenda não entra em pauta sozinha: é votada com a
+                # matéria principal (arts. 114-115).
+                if tipo != "EMENDA" and (
+                        not comissoes.exige_parecer(tipo) or
+                        comissoes.tem_parecer_aprovado(banco, pid)):
                     acoes.append("INCLUSAO_PAUTA")
 
         pendentes = [
             f"REQUERIMENTO {n}/{a} ({f})"
             for n, a, f in banco.execute(
                 "SELECT numero, ano, finalidade FROM proposicao "
-                "WHERE proposicao_alvo_id = ? AND situacao = "
-                "'EM_TRAMITACAO'", (pid,),
+                "WHERE proposicao_alvo_id = ? AND finalidade IS NOT NULL "
+                "AND situacao = 'EM_TRAMITACAO'", (pid,),
             )
         ]
+        emendas = [
+            {"rotulo": e["rotulo"], "especie": e["especie"],
+             "autor": e["autor"] or e["gabinete"],
+             "situacao": e["situacao"]}
+            for e in emendas_da_proposicao(banco, pid)
+        ] if tipo in TIPOS_EMENDAVEIS else []
 
         resultado.append({
             "id": pid, "rotulo": f"{tipo} {numero}/{ano}", "tipo": tipo,
@@ -670,6 +808,7 @@ def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
             "finalidade": finalidade, "alvo": alvo, "despacho": despacho,
             "despacho_data": despacho_data,
             "requerimentos_pendentes": pendentes,
+            "emendas": emendas,
         })
     return resultado
 
