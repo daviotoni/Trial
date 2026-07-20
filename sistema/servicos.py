@@ -317,6 +317,91 @@ def tramitar(
     return cursor.lastrowid
 
 
+def buscar_processos(banco: sqlite3.Connection, filtros: dict) -> list[dict]:
+    """Busca processos por vários critérios, com a localização atual.
+
+    `filtros` (todos opcionais): numero, ano, tipo, situacao, interessado
+    (parcial), assunto (parcial). Devolve, por processo, os dados de
+    identificação, a unidade onde ele está agora e o código do rito
+    vinculado. É o buscador do balcão de protocolo — e a consulta pública
+    de processos (transparência).
+    """
+    def _valor(chave):
+        v = filtros.get(chave)
+        return v[0] if isinstance(v, list) else v
+
+    condicoes, valores = [], []
+    for coluna, chave in (("numero", "numero"), ("ano", "ano")):
+        bruto = _valor(chave)
+        if bruto:
+            condicoes.append(f"p.{coluna} = ?")
+            valores.append(int(bruto))
+    for coluna, chave in (("tipo", "tipo"), ("situacao", "situacao")):
+        bruto = _valor(chave)
+        if bruto:
+            condicoes.append(f"p.{coluna} = ?")
+            valores.append(bruto)
+    for coluna, chave in (("interessado", "interessado"),
+                          ("assunto", "assunto")):
+        bruto = _valor(chave)
+        if bruto:
+            condicoes.append(f"p.{coluna} LIKE ?")
+            valores.append(f"%{bruto}%")
+    clausula = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
+    return [
+        {"id": pid, "numero": f"{numero}/{ano}", "tipo": tipo,
+         "assunto": assunto, "interessado": interessado, "situacao": situacao,
+         "data_autuacao": data, "localizacao": localizacao,
+         "rito": rito}
+        for (pid, numero, ano, tipo, assunto, interessado, situacao, data,
+             localizacao, rito) in banco.execute(
+            f"""SELECT p.id, p.numero, p.ano, p.tipo, p.assunto,
+                       p.interessado, p.situacao, p.data_autuacao,
+                       COALESCE(
+                         (SELECT ud.nome FROM tramitacao t
+                            JOIN unidade ud ON ud.id = t.unidade_destino_id
+                           WHERE t.processo_id = p.id
+                           ORDER BY t.id DESC LIMIT 1),
+                         (SELECT uo.nome FROM unidade uo
+                           WHERE uo.id = p.unidade_origem_id)),
+                       (SELECT tp.codigo FROM tipo_processo tp
+                         WHERE tp.id = p.tipo_processo_id)
+                  FROM processo p {clausula}
+                 ORDER BY p.ano DESC, p.numero DESC LIMIT 200""", valores,
+        )
+    ]
+
+
+def juntar_documento(banco: sqlite3.Connection, processo_id: int, tipo: str,
+                     titulo: str, data: str, autor: str | None = None) -> int:
+    """Junta um documento ao processo (ofício, parecer, despacho, anexo…)."""
+    if banco.execute("SELECT 1 FROM processo WHERE id = ?",
+                     (processo_id,)).fetchone() is None:
+        raise RegraViolada("processo inexistente")
+    if not tipo or not tipo.strip():
+        raise RegraViolada("informe o tipo do documento")
+    if not titulo or not titulo.strip():
+        raise RegraViolada("informe o título do documento")
+    return banco.execute(
+        "INSERT INTO documento (processo_id, tipo, titulo, autor, data) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (processo_id, tipo.strip(), titulo.strip(), autor, data),
+    ).lastrowid
+
+
+def documentos_do_processo(banco: sqlite3.Connection,
+                           processo_id: int) -> list[dict]:
+    """Documentos juntados ao processo, do mais recente ao mais antigo."""
+    return [
+        {"id": did, "tipo": tipo, "titulo": titulo, "autor": autor,
+         "data": data}
+        for did, tipo, titulo, autor, data in banco.execute(
+            "SELECT id, tipo, titulo, autor, data FROM documento "
+            "WHERE processo_id = ? ORDER BY id DESC", (processo_id,),
+        )
+    ]
+
+
 def processos_em_atraso(banco: sqlite3.Connection, referencia: str) -> list[dict]:
     """Processos parados: última tramitação sem recebimento e prazo vencido.
 

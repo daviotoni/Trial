@@ -242,23 +242,7 @@ class Aplicacao:
         ]
 
     def listar_processos(self, filtros):
-        condicoes, valores = [], []
-        if filtros.get("situacao"):
-            condicoes.append("situacao = ?")
-            valores.append(filtros["situacao"][0])
-        if filtros.get("ano"):
-            condicoes.append("ano = ?")
-            valores.append(int(filtros["ano"][0]))
-        clausula = ("WHERE " + " AND ".join(condicoes)) if condicoes else ""
-        return [
-            {"id": pid, "numero": f"{numero}/{ano}", "tipo": tipo,
-             "assunto": assunto, "situacao": situacao, "data": data}
-            for pid, numero, ano, tipo, assunto, situacao, data in
-            self.banco.execute(
-                f"SELECT id, numero, ano, tipo, assunto, situacao, "
-                f"data_autuacao FROM processo {clausula} "
-                f"ORDER BY ano DESC, numero DESC LIMIT 100", valores)
-        ]
+        return servicos.buscar_processos(self.banco, filtros)
 
     def listar_contratacoes(self):
         return [
@@ -284,16 +268,27 @@ class Aplicacao:
 
     def processo(self, processo_id: int):
         linha = self.banco.execute(
-            "SELECT numero, ano, tipo, assunto, situacao, data_autuacao "
-            "FROM processo WHERE id = ?", (processo_id,)
+            """SELECT p.numero, p.ano, p.tipo, p.assunto, p.interessado,
+                      p.situacao, p.data_autuacao,
+                      COALESCE(
+                        (SELECT ud.nome FROM tramitacao t
+                           JOIN unidade ud ON ud.id = t.unidade_destino_id
+                          WHERE t.processo_id = p.id
+                          ORDER BY t.id DESC LIMIT 1),
+                        (SELECT uo.nome FROM unidade uo
+                          WHERE uo.id = p.unidade_origem_id))
+                 FROM processo p WHERE p.id = ?""", (processo_id,)
         ).fetchone()
         if linha is None:
             raise Recurso404
-        numero, ano, tipo, assunto, situacao, autuacao = linha
+        numero, ano, tipo, assunto, interessado, situacao, autuacao, loc = linha
         trilha = [
-            {"de": origem, "para": destino, "despacho": despacho, "data": data}
-            for origem, destino, despacho, data in self.banco.execute(
-                """SELECT o.nome, d.nome, t.despacho, t.data_envio
+            {"id": tid, "de": origem, "para": destino, "despacho": despacho,
+             "data": data, "prazo": prazo, "recebido_em": recebido}
+            for tid, origem, destino, despacho, data, prazo, recebido in
+            self.banco.execute(
+                """SELECT t.id, o.nome, d.nome, t.despacho, t.data_envio,
+                          t.prazo, t.data_recebimento
                    FROM tramitacao t
                    JOIN unidade o ON o.id = t.unidade_origem_id
                    JOIN unidade d ON d.id = t.unidade_destino_id
@@ -301,8 +296,20 @@ class Aplicacao:
             )
         ]
         return {"id": processo_id, "numero": f"{numero}/{ano}", "tipo": tipo,
-                "assunto": assunto, "situacao": situacao,
-                "data_autuacao": autuacao, "tramitacoes": trilha}
+                "assunto": assunto, "interessado": interessado,
+                "situacao": situacao, "data_autuacao": autuacao,
+                "localizacao": loc, "tramitacoes": trilha,
+                "documentos": servicos.documentos_do_processo(
+                    self.banco, processo_id)}
+
+    def juntar_documento(self, processo_id: int, dados):
+        autenticacao.exigir(self.banco, self.usuario_atual, "PROTOCOLO")
+        did = servicos.juntar_documento(
+            self.banco, processo_id, dados.get("tipo", ""),
+            dados.get("titulo", ""), dados.get("data") or _hoje(),
+            dados.get("autor"))
+        self.banco.commit()
+        return {"id": did}
 
     def folha(self, folha_id: int):
         cab = self.banco.execute(
@@ -370,7 +377,17 @@ class Aplicacao:
 
     def processos_em_atraso(self, dados):
         return servicos.processos_em_atraso(
-            self.banco, self.query_atual.get("referencia", [""])[0])
+            self.banco, self.query_atual.get("referencia", [""])[0] or _hoje())
+
+    def painel_protocolo(self):
+        # Dashboard operacional do balcão de protocolo.
+        por_situacao = {
+            situacao: total for situacao, total in self.banco.execute(
+                "SELECT situacao, COUNT(*) FROM processo GROUP BY situacao")}
+        recentes = servicos.buscar_processos(self.banco, {})[:8]
+        em_atraso = servicos.processos_em_atraso(self.banco, _hoje())
+        return {"por_situacao": por_situacao, "recentes": recentes,
+                "em_atraso": em_atraso, "total": sum(por_situacao.values())}
 
     # -------------------- fluxo e competências ---------------------
 
@@ -950,6 +967,8 @@ ROTAS = [
      lambda app, m, d: app.listar_processos(app.query_atual)),
     ("GET", r"^/processos/(\d+)$", None,
      lambda app, m, d: app.processo(int(m.group(1)))),
+    ("POST", r"^/processos/(\d+)/documentos$", "*",
+     lambda app, m, d: app.juntar_documento(int(m.group(1)), d)),
     # Encaminhar/receber é liberado pela POSSE (quem detém o processo),
     # não por área — cada setor remete o que está com ele ao seguinte.
     ("POST", r"^/processos/(\d+)/tramitacoes$", "*",
@@ -958,6 +977,8 @@ ROTAS = [
      lambda app, m, d: app.receber_tramitacao(int(m.group(1)), d)),
     ("GET", r"^/processos/atrasados$", "PROTOCOLO",
      lambda app, m, d: app.processos_em_atraso(d)),
+    ("GET", r"^/protocolo/painel$", "PROTOCOLO",
+     lambda app, m, d: app.painel_protocolo()),
     ("GET", r"^/tipos-processo$", None,
      lambda app, m, d: app.tipos_processo()),
     ("GET", r"^/tipos-processo/([A-Za-z0-9_-]+)/etapas$", None,

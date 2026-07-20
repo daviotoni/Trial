@@ -343,6 +343,20 @@
 </section>
 
 <section id="protocolo">
+  <div class="cartao">
+    <h2>Painel do protocolo</h2>
+    <div id="protocolo-indicadores" class="linha"></div>
+    <p id="protocolo-atraso-titulo" style="display:none; margin-bottom:4px"><strong>Em atraso (prazo vencido):</strong></p>
+    <table id="tabela-protocolo-atraso" style="display:none">
+      <thead><tr><th>Processo</th><th>Assunto</th><th>Parado em</th><th>Prazo</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="protocolo-recentes-titulo" style="margin-bottom:4px"><strong>Recém-autuados:</strong></p>
+    <table id="tabela-protocolo-recentes">
+      <thead><tr><th>Processo</th><th>Assunto</th><th>Situação</th><th>Onde está</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
   <div class="linha">
     <div class="cartao">
       <h2>Autuar processo</h2>
@@ -352,6 +366,8 @@
       </select>
       <label>Assunto</label>
       <input id="proc-assunto" placeholder="Ex.: Aquisição de material de expediente">
+      <label>Interessado <small style="color:#667">(requerente/órgão)</small></label>
+      <input id="proc-interessado" placeholder="Ex.: Fulano de Tal / Secretaria X">
       <label>Unidade de origem</label>
       <select id="proc-unidade"></select>
       <label>Data de autuação</label>
@@ -360,19 +376,60 @@
       <div class="msg" id="msg-autuar"></div>
     </div>
     <div class="cartao">
-      <h2>Consultar / tramitar</h2>
-      <label>Nº interno do processo</label>
-      <input id="consulta-id" type="number" min="1" placeholder="id devolvido na autuação">
-      <button class="acao" id="btn-consultar">Consultar</button>
-      <div class="msg" id="msg-consulta"></div>
-      <div id="detalhe-processo"></div>
-      <div id="form-tramitar" style="display:none">
-        <label>Tramitar para</label>
-        <select id="tram-destino"></select>
-        <label>Despacho</label>
-        <input id="tram-despacho" placeholder="Ex.: Para análise e parecer">
-        <button class="acao" id="btn-tramitar">Tramitar</button>
+      <h2>Buscar processos</h2>
+      <div class="linha">
+        <div><label>Número</label><input id="busca-numero" type="number" min="1"></div>
+        <div><label>Ano</label><input id="busca-ano" type="number" placeholder="2026"></div>
       </div>
+      <label>Situação</label>
+      <select id="busca-situacao">
+        <option value="">Todas</option>
+        <option value="EM_TRAMITACAO">Em tramitação</option>
+        <option value="SOBRESTADO">Sobrestado</option>
+        <option value="ARQUIVADO">Arquivado</option>
+        <option value="CONCLUIDO">Concluído</option>
+      </select>
+      <label>Interessado</label>
+      <input id="busca-interessado" placeholder="parte do nome">
+      <label>Assunto</label>
+      <input id="busca-assunto" placeholder="parte do assunto">
+      <button class="acao" id="btn-buscar">Buscar</button>
+      <p id="busca-vazia" style="display:none; color:#555"></p>
+      <table id="tabela-busca" style="display:none">
+        <thead><tr><th>Processo</th><th>Assunto</th><th>Interessado</th><th>Situação</th><th>Onde está</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="cartao">
+    <h2>Detalhe do processo</h2>
+    <p style="color:#555">Clique num processo na busca (ou informe o nº interno) para ver a ficha completa.</p>
+    <label>Nº interno</label>
+    <input id="consulta-id" type="number" min="1" style="max-width:160px" placeholder="id">
+    <button class="acao" id="btn-consultar">Abrir</button>
+    <div class="msg" id="msg-consulta"></div>
+    <div id="detalhe-processo"></div>
+    <div id="form-tramitar" style="display:none">
+      <h3>Tramitar</h3>
+      <label>Tramitar para</label>
+      <select id="tram-destino"></select>
+      <label>Despacho</label>
+      <input id="tram-despacho" placeholder="Ex.: Para análise e parecer">
+      <label>Prazo (SLA) — opcional</label>
+      <input id="tram-prazo" type="date">
+      <button class="acao" id="btn-tramitar">Tramitar</button>
+    </div>
+    <div id="form-documento" style="display:none">
+      <h3>Juntar documento</h3>
+      <label>Tipo</label>
+      <select id="doc-tipo">
+        <option>Ofício</option><option>Parecer</option><option>Despacho</option>
+        <option>Requerimento</option><option>Anexo</option><option>Ata</option>
+      </select>
+      <label>Título / descrição</label>
+      <input id="doc-titulo" placeholder="Ex.: Ofício nº 12/2026 - SMS">
+      <button class="acao" id="btn-juntar-doc">Juntar ao processo</button>
+      <div class="msg" id="msg-doc"></div>
     </div>
   </div>
 </section>
@@ -1339,6 +1396,7 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   if (aba === "emendar") carregarEmendaveis();
   if (aba === "recursos") carregarRecursos();
   if (aba === "comissoes") carregarComissoes();
+  if (aba === "protocolo") carregarPainelProtocolo();
 });
 
 // Painel
@@ -1570,26 +1628,151 @@ document.getElementById("btn-autuar").addEventListener("click", async () => {
     const criado = await enviar("/processos", {
       tipo: document.getElementById("proc-tipo").value,
       assunto: document.getElementById("proc-assunto").value,
+      interessado: document.getElementById("proc-interessado").value || null,
       unidade_origem_id: Number(document.getElementById("proc-unidade").value),
       data_autuacao: document.getElementById("proc-data").value,
     });
     mostrar("msg-autuar", `Processo ${criado.numero} autuado (id interno ${criado.id}).`, "ok");
+    document.getElementById("proc-assunto").value = "";
+    document.getElementById("proc-interessado").value = "";
   } catch (erro) { mostrar("msg-autuar", erro.message, "erro"); }
 });
 
+const SIT_PROC = {
+  EM_TRAMITACAO: "Em tramitação", SOBRESTADO: "Sobrestado",
+  ARQUIVADO: "Arquivado", CONCLUIDO: "Concluído",
+};
+
+const abrirDetalheProcesso = (id) => {
+  document.getElementById("consulta-id").value = id;
+  carregarProcesso();
+  document.getElementById("detalhe-processo").scrollIntoView({behavior: "smooth"});
+};
+
+const carregarPainelProtocolo = async () => {
+  const ind = document.getElementById("protocolo-indicadores");
+  try {
+    const p = await consultar("/protocolo/painel");
+    const cartao = (rotulo, valor) =>
+      `<div class="indicador"><div class="valor">${valor}</div>` +
+      `<div class="nome">${rotulo}</div></div>`;
+    ind.innerHTML = cartao("Total", p.total) +
+      cartao("Em tramitação", p.por_situacao.EM_TRAMITACAO || 0) +
+      cartao("Arquivados", p.por_situacao.ARQUIVADO || 0) +
+      cartao("Concluídos", p.por_situacao.CONCLUIDO || 0) +
+      cartao("Em atraso", p.em_atraso.length);
+
+    const atrasoTit = document.getElementById("protocolo-atraso-titulo");
+    const tabAtraso = document.getElementById("tabela-protocolo-atraso");
+    const corpoA = tabAtraso.querySelector("tbody");
+    corpoA.innerHTML = "";
+    if (p.em_atraso.length) {
+      atrasoTit.style.display = ""; tabAtraso.style.display = "";
+      p.em_atraso.forEach(x => {
+        const tr = document.createElement("tr");
+        tr.style.cursor = "pointer";
+        tr.innerHTML = `<td>${x.processo}</td><td>${x.assunto}</td>` +
+          `<td>${x.unidade_destino}</td><td>${x.prazo}</td>`;
+        tr.addEventListener("click", () => abrirDetalheProcesso(x.processo_id));
+        corpoA.appendChild(tr);
+      });
+    } else { atrasoTit.style.display = "none"; tabAtraso.style.display = "none"; }
+
+    const corpoR = document.querySelector("#tabela-protocolo-recentes tbody");
+    corpoR.innerHTML = "";
+    p.recentes.forEach(x => {
+      const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      tr.innerHTML = `<td><strong>${x.numero}</strong></td><td>${x.assunto}</td>` +
+        `<td>${SIT_PROC[x.situacao] || x.situacao}</td><td>${x.localizacao || "—"}</td>`;
+      tr.addEventListener("click", () => abrirDetalheProcesso(x.id));
+      corpoR.appendChild(tr);
+    });
+  } catch (e) { ind.innerHTML = `<p style="color:#a33">${e.message}</p>`; }
+};
+const buscarProcessos = async () => {
+  const p = new URLSearchParams();
+  const add = (id, chave) => {
+    const v = document.getElementById(id).value.trim();
+    if (v) p.set(chave, v);
+  };
+  add("busca-numero", "numero"); add("busca-ano", "ano");
+  add("busca-situacao", "situacao"); add("busca-interessado", "interessado");
+  add("busca-assunto", "assunto");
+  const tabela = document.getElementById("tabela-busca");
+  const corpo = tabela.querySelector("tbody");
+  const vazia = document.getElementById("busca-vazia");
+  try {
+    const lista = await consultar(`/processos${p.toString() ? "?" + p : ""}`);
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazia.style.display = "";
+      vazia.textContent = "Nenhum processo encontrado.";
+      return;
+    }
+    vazia.style.display = "none"; tabela.style.display = "";
+    lista.forEach(pr => {
+      const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      tr.innerHTML = `<td><strong>${pr.numero}</strong></td><td>${pr.assunto}</td>` +
+        `<td>${pr.interessado || "—"}</td><td>${SIT_PROC[pr.situacao] || pr.situacao}</td>` +
+        `<td>${pr.localizacao || "—"}</td>`;
+      tr.addEventListener("click", () => {
+        document.getElementById("consulta-id").value = pr.id;
+        carregarProcesso();
+        document.getElementById("detalhe-processo").scrollIntoView(
+          {behavior: "smooth"});
+      });
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazia.style.display = "";
+    vazia.textContent = e.message;
+  }
+};
+document.getElementById("btn-buscar").addEventListener("click", buscarProcessos);
+
 const carregarProcesso = async () => {
   const id = document.getElementById("consulta-id").value;
+  const detalhe = document.getElementById("detalhe-processo");
   try {
     const processo = await consultar(`/processos/${id}`);
     mostrar("msg-consulta", "", "");
     const trilha = processo.tramitacoes.map(t =>
-      `<tr><td>${t.data}</td><td>${t.de}</td><td>${t.para}</td><td>${t.despacho || ""}</td></tr>`
+      `<tr><td>${t.data}</td><td>${t.de}</td><td>${t.para}</td>` +
+      `<td>${t.despacho || ""}</td>` +
+      `<td>${t.recebido_em ? "Recebido em " + t.recebido_em
+              : (t.prazo ? "Prazo " + t.prazo : "—")}</td></tr>`
     ).join("");
-    const detalhe = document.getElementById("detalhe-processo");
+    const docs = processo.documentos.map(dc =>
+      `<li><strong>${dc.tipo}</strong>: ${dc.titulo} <small>(${dc.data})</small></li>`
+    ).join("");
     detalhe.innerHTML =
       `<p><strong>${processo.numero}</strong> — ${processo.assunto}<br>` +
-      `Situação: ${processo.situacao} · Autuado em ${processo.data_autuacao}</p>` +
-      (trilha ? `<table><thead><tr><th>Data</th><th>De</th><th>Para</th><th>Despacho</th></tr></thead><tbody>${trilha}</tbody></table>` : "<p>Sem tramitações.</p>");
+      `Interessado: ${processo.interessado || "—"} · Situação: ` +
+      `${SIT_PROC[processo.situacao] || processo.situacao} · Autuado em ` +
+      `${processo.data_autuacao}<br>Onde está: <strong>${processo.localizacao || "—"}</strong></p>` +
+      (trilha ? `<table><thead><tr><th>Data</th><th>De</th><th>Para</th><th>Despacho</th><th>Situação</th></tr></thead><tbody>${trilha}</tbody></table>` : "<p>Sem tramitações.</p>") +
+      `<h3>Documentos juntados</h3>` +
+      (docs ? `<ul>${docs}</ul>` : "<p style='color:#555'>Nenhum documento juntado.</p>");
+    // Confirmar recebimento da última tramitação ainda não recebida.
+    const pendente = [...processo.tramitacoes].reverse()
+      .find(t => !t.recebido_em);
+    if (pendente) {
+      const rb = document.createElement("button");
+      rb.className = "acao";
+      rb.style.marginTop = "8px"; rb.style.marginRight = "6px";
+      rb.textContent = `Confirmar recebimento em ${pendente.para}`;
+      rb.addEventListener("click", async () => {
+        try {
+          await enviar(`/tramitacoes/${pendente.id}/recebimento`,
+            {data_recebimento: new Date().toISOString().slice(0, 10)});
+          mostrar("msg-consulta", "Recebimento confirmado.", "ok");
+          carregarProcesso();
+        } catch (e) { mostrar("msg-consulta", e.message, "erro"); }
+      });
+      detalhe.appendChild(rb);
+    }
     // Exclusão definitiva: privativa do administrador (fica na auditoria).
     if (localStorage.getItem("perfil") === "ADMIN") {
       const b = document.createElement("button");
@@ -1604,6 +1787,7 @@ const carregarProcesso = async () => {
           const r = await enviar(`/processos/${id}/exclusao`, {});
           detalhe.innerHTML = "";
           document.getElementById("form-tramitar").style.display = "none";
+          document.getElementById("form-documento").style.display = "none";
           mostrar("msg-consulta", `Processo ${r.numero} excluído` +
             (r.proposicoes_excluidas
               ? ` (com ${r.proposicoes_excluidas} proposição(ões)).` : "."), "ok");
@@ -1613,9 +1797,14 @@ const carregarProcesso = async () => {
       detalhe.appendChild(b);
     }
     document.getElementById("form-tramitar").style.display = "";
+    // Juntar documento só para quem opera o Protocolo.
+    const areas = JSON.parse(localStorage.getItem("areas") || "[]");
+    document.getElementById("form-documento").style.display =
+      areas.includes("PROTOCOLO") ? "" : "none";
   } catch (erro) {
-    document.getElementById("detalhe-processo").innerHTML = "";
+    detalhe.innerHTML = "";
     document.getElementById("form-tramitar").style.display = "none";
+    document.getElementById("form-documento").style.display = "none";
     mostrar("msg-consulta", erro.message, "erro");
   }
 };
@@ -1627,9 +1816,22 @@ document.getElementById("btn-tramitar").addEventListener("click", async () => {
       unidade_destino_id: Number(document.getElementById("tram-destino").value),
       despacho: document.getElementById("tram-despacho").value,
       data_envio: new Date().toISOString().slice(0, 10),
+      prazo: document.getElementById("tram-prazo").value || null,
     });
     carregarProcesso();
   } catch (erro) { mostrar("msg-consulta", erro.message, "erro"); }
+});
+document.getElementById("btn-juntar-doc").addEventListener("click", async () => {
+  const id = document.getElementById("consulta-id").value;
+  try {
+    await enviar(`/processos/${id}/documentos`, {
+      tipo: document.getElementById("doc-tipo").value,
+      titulo: document.getElementById("doc-titulo").value,
+    });
+    document.getElementById("doc-titulo").value = "";
+    mostrar("msg-doc", "Documento juntado.", "ok");
+    carregarProcesso();
+  } catch (erro) { mostrar("msg-doc", erro.message, "erro"); }
 });
 
 // Plenário
