@@ -92,7 +92,15 @@ class Aplicacao:
         return {"token": self.sessoes.abrir(usuario),
                 "perfil": usuario["perfil"]}
 
+    def _exigir_admin(self):
+        # Gerir acessos/logins é privativo do administrador — nenhum setor
+        # enxerga ou opera a gestão de usuários de outro (nem a própria).
+        if self.usuario_atual["perfil"] != "ADMIN":
+            raise AcessoNegado(
+                "a gestão de acessos e logins é privativa do administrador")
+
     def criar_usuario(self, dados):
+        self._exigir_admin()
         # O acesso vem da unidade (setor). O 'perfil' é rótulo legado: só
         # importa distinguir ADMIN. Sem perfil e com unidade → não-admin.
         perfil = dados.get("perfil")
@@ -112,6 +120,7 @@ class Aplicacao:
         return {"id": uid}
 
     def listar_usuarios(self):
+        self._exigir_admin()
         # Inclui os desativados: a tela de gestão precisa vê-los para
         # reativar. `ativo` diferencia na interface.
         return [
@@ -139,6 +148,7 @@ class Aplicacao:
 
     def editar_usuario(self, usuario_id: int, dados):
         """Edita o acesso: setor (unidade_id), senha e/ou ativo (0/1)."""
+        self._exigir_admin()
         self._alvo_gestao_usuario(usuario_id)
         try:
             login = autenticacao.atualizar_usuario(
@@ -154,6 +164,7 @@ class Aplicacao:
         return {"id": usuario_id, "login": login}
 
     def excluir_usuario(self, usuario_id: int):
+        self._exigir_admin()
         self._alvo_gestao_usuario(usuario_id)
         try:
             login = autenticacao.excluir_usuario(self.banco, usuario_id)
@@ -856,11 +867,12 @@ class Aplicacao:
 # consultas de transparência ativa são abertas por princípio (LAI).
 ROTAS = [
     ("POST", r"^/login$", None, lambda app, m, d: app.login(d)),
-    ("POST", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.criar_usuario(d)),
-    ("GET", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.listar_usuarios()),
-    ("POST", r"^/usuarios/(\d+)$", "USUARIOS",
+    # Gestão de acessos: rota logada ("*"), mas os handlers exigem ADMIN.
+    ("POST", r"^/usuarios$", "*", lambda app, m, d: app.criar_usuario(d)),
+    ("GET", r"^/usuarios$", "*", lambda app, m, d: app.listar_usuarios()),
+    ("POST", r"^/usuarios/(\d+)$", "*",
      lambda app, m, d: app.editar_usuario(int(m.group(1)), d)),
-    ("POST", r"^/usuarios/(\d+)/exclusao$", "USUARIOS",
+    ("POST", r"^/usuarios/(\d+)/exclusao$", "*",
      lambda app, m, d: app.excluir_usuario(int(m.group(1)))),
     ("GET", r"^/me$", "*", lambda app, m, d: app.eu()),
     ("GET", r"^/caixa$", "*", lambda app, m, d: app.caixa()),

@@ -92,6 +92,9 @@ def criar_banco(caminho: str = ":memory:",
         conexao.execute(
             "INSERT OR IGNORE INTO unidade_acao (unidade_id, acao) "
             "SELECT id, 'DESPACHAR' FROM unidade WHERE nome = 'Presidência'")
+        # Gestão de acessos é exclusiva do admin: remove a área USUARIOS
+        # de qualquer setor (a TI a possuía).
+        conexao.execute("DELETE FROM unidade_area WHERE area = 'USUARIOS'")
         for tabela, ddl in bancodados.TABELAS_NOVAS_SQLITE.items():
             existe = conexao.execute(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' "

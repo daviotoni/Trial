@@ -87,7 +87,7 @@
   <button data-aba="compras" data-area="COMPRAS">Compras</button>
   <button data-aba="folha" data-area="FOLHA">Folha</button>
   <button data-aba="auditoria" data-area="CONTROLE">Auditoria</button>
-  <button data-aba="usuarios" data-area="USUARIOS">Usuários</button>
+  <button data-aba="usuarios" data-area="__admin">Usuários</button>
 </nav>
 <main>
 
@@ -471,6 +471,7 @@ const aplicarPermissoes = () => {
     const area = b.dataset.area;
     let ver;
     if (area === "__publico") ver = true;
+    else if (area === "__admin") ver = logado && localStorage.getItem("perfil") === "ADMIN";
     else if (area === "__login") ver = logado && temUnidade;
     else if (area.startsWith("acao:")) ver = logado && acoes.includes(area.slice(5));
     else ver = logado && areas.includes(area);
@@ -868,7 +869,7 @@ const aoEntrar = async () => {
   await carregarMeuSetor();
   await carregarCaixa();
   await carregarProposicoes();
-  if ((eu.areas || []).includes("USUARIOS")) {
+  if (eu.perfil === "ADMIN") {
     await carregarUnidadesUsuario();
     await carregarUsuarios();
   }

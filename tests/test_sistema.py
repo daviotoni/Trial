@@ -22,11 +22,16 @@ class TestBancoSistema(unittest.TestCase):
         # uma atividade/área. Não são setores com login: o nó agrupador dos
         # gabinetes e os serviços auxiliares operacionais de 4º grau (copa,
         # limpeza, etc.), operados sob a coordenadoria responsável — exceto
-        # o Departamento do e-Social, que tem artigo próprio.
+        # o Departamento do e-Social, que tem artigo próprio. A Coordenadoria
+        # de TI é setor de infraestrutura, sem área de negócio: a gestão de
+        # acessos/logins é prerrogativa do administrador, não área de setor.
         from orgao.cmdc import SERVICOS_AUXILIARES
         operacionais = [s for s in SERVICOS_AUXILIARES
                         if s != "Departamento do e-Social"]
-        excluidos = tuple(["Gabinetes de Vereadores"] + operacionais)
+        excluidos = tuple(
+            ["Gabinetes de Vereadores",
+             "Coordenadoria de Tecnologia da Informação e Comunicação"]
+            + operacionais)
         marcadores = ",".join("?" * len(excluidos))
         sem_area = self.banco.execute(
             f"""SELECT nome FROM unidade u

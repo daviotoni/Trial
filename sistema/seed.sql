@@ -429,7 +429,6 @@ INSERT INTO unidade_area (unidade_id, area) VALUES
   (23, 'LEGISLATIVO'),
   (24, 'LEGISLATIVO'),
   (21, 'LEGISLATIVO'),
-  (39, 'USUARIOS'),
   (17, 'ADMINISTRACAO'),
   (15, 'ADMINISTRACAO'),
   (16, 'PLANEJAMENTO'),
@@ -483,6 +482,7 @@ INSERT INTO unidade_area (unidade_id, area) VALUES
 INSERT INTO unidade_acao (unidade_id, acao) VALUES
   (2, 'CONVOCAR_SESSAO'),
   (2, 'PAUTAR'),
+  (2, 'DESPACHAR'),
   (1, 'CONVOCAR_SESSAO'),
   (1, 'APRESENTAR_PROPOSICAO'),
   (12, 'PAUTAR'),

@@ -60,7 +60,9 @@ UNIDADE_AREAS = {
     "Coordenadoria de Assuntos de Plenário": ["LEGISLATIVO"],
     "Coordenadoria de Atas e Projetos": ["LEGISLATIVO"],
     "Assistência às Comissões Permanentes": ["LEGISLATIVO"],
-    "Coordenadoria de Tecnologia da Informação e Comunicação": ["USUARIOS"],
+    # A TI zela pela infraestrutura, mas NÃO gere acessos/logins: a gestão
+    # de usuários é privativa do administrador (não é área de setor).
+    "Coordenadoria de Tecnologia da Informação e Comunicação": [],
     # Órgãos de 1º grau
     "Diretoria-Geral": ["ADMINISTRACAO"],
     "Superintendência-Geral": ["ADMINISTRACAO"],

@@ -3,7 +3,46 @@
 import unittest
 
 from sistema import autenticacao
+from sistema.api import Aplicacao
+from sistema.autenticacao import AcessoNegado
 from sistema.demo import criar_banco
+
+
+class TestGestaoExclusivaDoAdmin(unittest.TestCase):
+    """A gestão de acessos/logins é privativa do administrador."""
+
+    def setUp(self):
+        self.app = Aplicacao(":memory:")
+        self.app.banco.commit()
+
+    def test_setor_nao_admin_nao_gere_usuarios(self):
+        # TI (antes tinha USUARIOS) e qualquer outro setor: sem acesso.
+        ti = self.app.banco.execute(
+            "SELECT id FROM unidade WHERE nome = "
+            "'Coordenadoria de Tecnologia da Informação e Comunicação'"
+        ).fetchone()[0]
+        self.assertEqual(
+            self.app.banco.execute(
+                "SELECT COUNT(*) FROM unidade_area WHERE area = 'USUARIOS'"
+            ).fetchone()[0], 0)
+        self.app.usuario_atual = {"login": "ti", "perfil": "LEGISLATIVO",
+                                  "unidade_id": ti}
+        for chamada in (
+            lambda: self.app.listar_usuarios(),
+            lambda: self.app.criar_usuario({"login": "x", "senha": "senha1234",
+                                            "unidade_id": ti}),
+            lambda: self.app.editar_usuario(1, {"ativo": 0}),
+            lambda: self.app.excluir_usuario(1),
+        ):
+            with self.assertRaises(AcessoNegado):
+                chamada()
+
+    def test_admin_gere_normalmente(self):
+        self.app.usuario_atual = {"login": "admin", "perfil": "ADMIN"}
+        antes = len(self.app.listar_usuarios())
+        self.app.criar_usuario({"login": "novo", "senha": "senha1234",
+                                "unidade_id": 50})
+        self.assertEqual(len(self.app.listar_usuarios()), antes + 1)
 
 
 class TestGestaoUsuarios(unittest.TestCase):
