@@ -527,14 +527,29 @@ class Aplicacao:
         self.banco.commit()
         return {"id": rascunho_id, "excluido": True}
 
-    def protocolar_rascunho(self, rascunho_id: int, dados):
+    def apresentar_rascunho(self, rascunho_id: int, dados):
+        # O gabinete apresenta; a numeração/autuação é do Protocolo.
         autenticacao.exigir_acao(self.banco, self.usuario_atual,
                                  "APRESENTAR_PROPOSICAO")
-        _, rotulo = legislativo.protocolar_rascunho(
-            self.banco, rascunho_id, self._unidade_do_usuario(),
-            dados["data"])
+        situacao = legislativo.apresentar_rascunho(
+            self.banco, rascunho_id, self._unidade_do_usuario())
         self.banco.commit()
-        return {"id": rascunho_id, "rotulo": rotulo}
+        return {"id": rascunho_id, "situacao": situacao}
+
+    def proposicoes_apresentadas(self):
+        autenticacao.exigir(self.banco, self.usuario_atual, "PROTOCOLO")
+        return legislativo.proposicoes_apresentadas(self.banco)
+
+    def autuar_proposicao(self, proposicao_id: int, dados):
+        # Autuação e numeração são atos do Protocolo (art. 37); a matéria
+        # nasce no Protocolo, que dá o andamento inicial.
+        autenticacao.exigir(self.banco, self.usuario_atual, "PROTOCOLO")
+        _, rotulo = legislativo.autuar_proposicao(
+            self.banco, proposicao_id,
+            legislativo._unidade_protocolo(self.banco),
+            dados.get("data") or _hoje())
+        self.banco.commit()
+        return {"id": proposicao_id, "rotulo": rotulo}
 
     # ------------------- emendas (arts. 114-115) ---------------------
 
@@ -952,8 +967,12 @@ ROTAS = [
      lambda app, m, d: app.atualizar_rascunho(int(m.group(1)), d)),
     ("POST", r"^/rascunhos/(\d+)/exclusao$", "LEGISLATIVO",
      lambda app, m, d: app.excluir_rascunho(int(m.group(1)))),
-    ("POST", r"^/rascunhos/(\d+)/protocolo$", "LEGISLATIVO",
-     lambda app, m, d: app.protocolar_rascunho(int(m.group(1)), d)),
+    ("POST", r"^/rascunhos/(\d+)/apresentacao$", "LEGISLATIVO",
+     lambda app, m, d: app.apresentar_rascunho(int(m.group(1)), d)),
+    ("GET", r"^/proposicoes-apresentadas$", "PROTOCOLO",
+     lambda app, m, d: app.proposicoes_apresentadas()),
+    ("POST", r"^/proposicoes/(\d+)/autuacao$", "PROTOCOLO",
+     lambda app, m, d: app.autuar_proposicao(int(m.group(1)), d)),
     ("GET", r"^/organograma$", None, lambda app, m, d: app.organograma()),
     ("GET", r"^/unidades$", None, lambda app, m, d: app.unidades()),
     ("GET", r"^/cargos$", None, lambda app, m, d: app.cargos()),

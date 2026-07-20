@@ -23,3 +23,18 @@ Protocolo é a porta de entrada e o eixo da tramitação.
 Sem mudança de schema: `processo.interessado` e a tabela `documento` já
 existem. Alçada: área **PROTOCOLO** (Coordenadoria da Secretaria-Geral);
 a consulta de processos é pública por transparência (LAI).
+
+## Entrada única: o Protocolo autua e numera tudo (art. 37)
+
+Todo processo nasce no Protocolo. A autuação e a numeração são atos
+privativos do Protocolo — nenhum setor numera ou autua por conta própria.
+
+- **Proposições dos gabinetes**: o gabinete **apresenta** (situação
+  `APRESENTADA`, sem número); a proposição entra na fila do Protocolo, que
+  a **autua** (numera, abre o processo com origem no Protocolo, vincula o
+  rito) e dá o **andamento inicial** ao setor seguinte. Funções:
+  `apresentar_rascunho`, `proposicoes_apresentadas`, `autuar_proposicao`.
+- **Compras/Licitações**: a contratação é autuada com o processo nascendo
+  no Protocolo; o setor demandante fica como interessado.
+- **Processos administrativos**: autuados diretamente pelo Protocolo, como
+  já era.

@@ -243,8 +243,9 @@
   <div class="cartao">
     <h2>Nova proposição <small id="np-setor" style="font-weight:normal"></small></h2>
     <p style="color:#555">Trabalhe em <b>rascunho</b> (sem número, visível só ao seu gabinete) e
-      <b>protocole</b> quando pronta — a numeração oficial nasce no protocolo.
-      Justificativa é obrigatória para protocolar (art. 88, §4º); projetos exigem o texto articulado (art. 92).</p>
+      <b>apresente</b> quando pronta. A numeração e a autuação são feitas pelo <b>Protocolo</b>
+      (art. 37) — a matéria fica "apresentada" até o Protocolo autuar.
+      Justificativa é obrigatória (art. 88, §4º); projetos exigem o texto articulado (art. 92).</p>
     <label>Tipo</label>
     <select id="np-tipo"></select>
     <small id="np-base" style="color:#667"></small>
@@ -267,7 +268,7 @@
     </select>
     <div style="display:flex; gap:8px; flex-wrap:wrap">
       <button class="acao" id="btn-salvar-rascunho">Salvar rascunho</button>
-      <button class="acao" id="btn-protocolar">Protocolar</button>
+      <button class="acao" id="btn-protocolar">Apresentar</button>
       <button class="acao" id="btn-cancelar-edicao" style="display:none; background:#666">Cancelar edição</button>
     </div>
     <p id="msg-np" class="msg"></p>
@@ -356,6 +357,17 @@
       <thead><tr><th>Processo</th><th>Assunto</th><th>Situação</th><th>Onde está</th></tr></thead>
       <tbody></tbody>
     </table>
+  </div>
+  <div class="cartao">
+    <h2>Proposições aguardando autuação (art. 37)</h2>
+    <p style="color:#555">Proposições apresentadas pelos gabinetes. O Protocolo <b>autua</b> — numera,
+      abre o processo (que nasce aqui) e dá o andamento inicial ao rito.</p>
+    <p id="autuacao-vazia" style="display:none; color:#555">Nenhuma proposição aguardando autuação.</p>
+    <table id="tabela-autuacao" style="display:none">
+      <thead><tr><th>Tipo</th><th>Ementa</th><th>Autor</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="msg-autuacao" class="msg"></p>
   </div>
   <div class="linha">
     <div class="cartao">
@@ -1299,11 +1311,11 @@ const carregarRascunhos = async () => {
         document.getElementById("btn-salvar-rascunho").textContent = "Salvar alterações";
         window.scrollTo({top: 0, behavior: "smooth"});
       });
-      botao("Protocolar", async () => {
+      botao("Apresentar", async () => {
         try {
-          const hoje = new Date().toISOString().slice(0, 10);
-          const resp = await enviar(`/rascunhos/${r.id}/protocolo`, {data: hoje});
-          mostrar("msg-np", `${resp.rotulo} protocolada — está na sua caixa.`, "ok");
+          await enviar(`/rascunhos/${r.id}/apresentacao`, {});
+          mostrar("msg-np", "Proposição apresentada — aguardando autuação " +
+            "e numeração pelo Protocolo (art. 37).", "ok");
           carregarRascunhos(); carregarCaixa(); carregarProposicoes();
         } catch (e) { mostrar("msg-np", e.message, "erro"); }
       });
@@ -1338,12 +1350,12 @@ document.getElementById("btn-protocolar").addEventListener("click", async () => 
   const dados = dadosFormNP();
   if (!dados.ementa) { mostrar("msg-np", "Escreva a ementa.", "erro"); return; }
   try {
-    const hoje = new Date().toISOString().slice(0, 10);
     let id = npEditando;
     if (id) await enviar(`/rascunhos/${id}`, dados);
     else id = (await enviar("/rascunhos", dados)).id;
-    const resp = await enviar(`/rascunhos/${id}/protocolo`, {data: hoje});
-    mostrar("msg-np", `${resp.rotulo} protocolada — está na sua caixa para encaminhar.`, "ok");
+    await enviar(`/rascunhos/${id}/apresentacao`, {});
+    mostrar("msg-np", "Proposição apresentada — aguardando autuação e " +
+      "numeração pelo Protocolo (art. 37).", "ok");
     limparFormNP(); carregarRascunhos(); carregarCaixa(); carregarProposicoes();
   } catch (e) { mostrar("msg-np", e.message, "erro"); }
 });
@@ -1396,7 +1408,7 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   if (aba === "emendar") carregarEmendaveis();
   if (aba === "recursos") carregarRecursos();
   if (aba === "comissoes") carregarComissoes();
-  if (aba === "protocolo") carregarPainelProtocolo();
+  if (aba === "protocolo") { carregarPainelProtocolo(); carregarAutuacao(); }
 });
 
 // Painel
@@ -1647,6 +1659,40 @@ const abrirDetalheProcesso = (id) => {
   document.getElementById("consulta-id").value = id;
   carregarProcesso();
   document.getElementById("detalhe-processo").scrollIntoView({behavior: "smooth"});
+};
+
+const carregarAutuacao = async () => {
+  const tabela = document.getElementById("tabela-autuacao");
+  const corpo = tabela.querySelector("tbody");
+  const vazia = document.getElementById("autuacao-vazia");
+  try {
+    const lista = await consultar("/proposicoes-apresentadas");
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazia.style.display = ""; return;
+    }
+    vazia.style.display = "none"; tabela.style.display = "";
+    lista.forEach(p => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${p.nome}</td><td>${p.ementa}</td>` +
+        `<td>${p.autor || p.gabinete || "—"}</td><td></td>`;
+      const b = document.createElement("button");
+      b.className = "acao"; b.textContent = "Autuar";
+      b.addEventListener("click", async () => {
+        try {
+          const r = await enviar(`/proposicoes/${p.id}/autuacao`, {});
+          mostrar("msg-autuacao",
+            `Autuada como ${r.rotulo} — processo aberto no Protocolo.`, "ok");
+          carregarAutuacao(); carregarPainelProtocolo(); carregarCaixa();
+        } catch (e) { mostrar("msg-autuacao", e.message, "erro"); }
+      });
+      tr.lastChild.appendChild(b);
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazia.style.display = "";
+    vazia.textContent = e.message;
+  }
 };
 
 const carregarPainelProtocolo = async () => {

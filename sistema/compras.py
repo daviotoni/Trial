@@ -79,10 +79,20 @@ def abrir_contratacao(
     ).fetchone()
     numero = ultimo + 1
 
+    # A contratação nasce no Protocolo (art. 37): o processo é autuado com
+    # origem no Protocolo e o setor demandante fica como interessado. O
+    # rito da COMPRA já começa na Secretaria-Geral (etapa 1).
+    protocolo = banco.execute(
+        "SELECT id FROM unidade WHERE nome = "
+        "'Coordenadoria da Secretaria-Geral'").fetchone()
+    demandante = banco.execute(
+        "SELECT nome FROM unidade WHERE id = ?",
+        (unidade_demandante_id,)).fetchone()
     processo_id, _ = autuar_processo(
         banco, "ADMINISTRATIVO",
         f"{modalidade} {numero}/{ano} — {objeto}",
-        unidade_demandante_id, data,
+        protocolo[0] if protocolo else unidade_demandante_id, data,
+        demandante[0] if demandante else None,
     )
     contratacao_id = banco.execute(
         "INSERT INTO contratacao (modalidade, numero, ano, objeto, "

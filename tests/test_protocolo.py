@@ -136,6 +136,61 @@ class TestProtocolo(unittest.TestCase):
         with self.assertRaises(RegraViolada):
             servicos.receber_tramitacao(self.banco, tid, "2026-07-23")
 
+    # --- entrada única: Protocolo autua as proposições ---------------
+
+    def test_gabinete_apresenta_protocolo_autua(self):
+        from sistema import legislativo
+        app = Aplicacao(":memory:")
+        gab = app.banco.execute(
+            "SELECT id FROM unidade WHERE nome LIKE '%Chiquinho%'"
+        ).fetchone()[0]
+        prot = app.banco.execute(
+            "SELECT id FROM unidade WHERE nome = "
+            "'Coordenadoria da Secretaria-Geral'").fetchone()[0]
+        rid = legislativo.criar_rascunho(
+            app.banco, gab, "PL", "Semana do Livro", texto="Art. 1º",
+            justificativa="J.")
+        app.banco.commit()
+
+        # gabinete apresenta
+        app.usuario_atual = {"login": "gab", "perfil": "LEGISLATIVO",
+                             "unidade_id": gab}
+        self.assertEqual(
+            app.apresentar_rascunho(rid, {})["situacao"], "APRESENTADA")
+        # gabinete NÃO autua (é do Protocolo)
+        with self.assertRaises(AcessoNegado):
+            app.autuar_proposicao(rid, {})
+        with self.assertRaises(AcessoNegado):
+            app.proposicoes_apresentadas()
+
+        # Protocolo vê a fila e autua; o processo nasce no Protocolo
+        app.usuario_atual = {"login": "prot", "perfil": "PROTOCOLO",
+                             "unidade_id": prot}
+        self.assertEqual(
+            [p["id"] for p in app.proposicoes_apresentadas()], [rid])
+        resp = app.autuar_proposicao(rid, {"data": "2026-07-20"})
+        self.assertEqual(resp["rotulo"], "PL 1/2026")
+        origem = app.banco.execute(
+            "SELECT unidade_origem_id FROM processo WHERE id = "
+            "(SELECT processo_id FROM proposicao WHERE id = ?)", (rid,)
+        ).fetchone()[0]
+        self.assertEqual(origem, prot)
+
+    def test_compra_nasce_no_protocolo(self):
+        from sistema import compras
+        demandante = self.banco.execute(
+            "SELECT id FROM unidade WHERE nome = "
+            "'Coordenadoria de Material'").fetchone()[0]
+        cid, _ = compras.abrir_contratacao(
+            self.banco, "PREGAO", "Material de escritório", 10000,
+            demandante, "2026-07-20")
+        origem, interessado = self.banco.execute(
+            """SELECT p.unidade_origem_id, p.interessado FROM processo p
+                 JOIN contratacao c ON c.processo_id = p.id
+                WHERE c.id = ?""", (cid,)).fetchone()
+        self.assertEqual(origem, self.protocolo)
+        self.assertEqual(interessado, "Coordenadoria de Material")
+
 
 if __name__ == "__main__":
     unittest.main()

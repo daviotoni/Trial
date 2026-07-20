@@ -73,9 +73,10 @@ def painel(banco: sqlite3.Connection) -> dict:
         "processos": um("SELECT COUNT(*) FROM processo"),
         "processos_em_tramitacao": um("SELECT COUNT(*) FROM processo "
                                       "WHERE situacao = 'EM_TRAMITACAO'"),
-        # Rascunhos de gabinete não são públicos (só contam protocoladas).
+        # Só contam as autuadas: rascunho e apresentada (sem número, ainda
+        # no gabinete/aguardando o Protocolo) não são públicas.
         "proposicoes": um("SELECT COUNT(*) FROM proposicao "
-                          "WHERE situacao <> 'RASCUNHO'"),
+                          "WHERE situacao NOT IN ('RASCUNHO', 'APRESENTADA')"),
         "sessoes": um("SELECT COUNT(*) FROM sessao"),
         "votacoes": um("SELECT COUNT(*) FROM votacao"),
         "contratacoes": um("SELECT COUNT(*) FROM contratacao"),

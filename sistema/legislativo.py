@@ -288,27 +288,36 @@ def rascunhos_do_setor(banco: sqlite3.Connection,
     ]
 
 
-def protocolar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
-                        unidade_id: int, data: str) -> tuple[int, str]:
-    """Protocola o rascunho: valida, numera, autua e define o autor.
+def _unidade_protocolo(banco: sqlite3.Connection) -> int:
+    """Setor de Protocolo (Coordenadoria da Secretaria-Geral, art. 37)."""
+    linha = banco.execute(
+        "SELECT id FROM unidade WHERE nome = "
+        "'Coordenadoria da Secretaria-Geral'").fetchone()
+    if linha is None:
+        raise RegraViolada("setor de Protocolo não encontrado")
+    return linha[0]
+
+
+def apresentar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
+                        unidade_id: int) -> str:
+    """O gabinete APRESENTA o rascunho: valida e o deixa pronto para o
+    Protocolo autuar (situação APRESENTADA, ainda sem número).
 
     Validações do Regimento: justificativa obrigatória (art. 88, §4º),
     texto articulado para projetos (art. 92) e subtipo para as espécies
-    que o exigem. A numeração sequencial por tipo/ano nasce aqui; o
-    processo é autuado com origem no gabinete e entra no rito quando o
-    tipo tiver fluxo configurado. Autor = vereador titular do gabinete.
+    que o exigem. A numeração e a autuação são atos do Protocolo (art. 37),
+    feitos em `autuar_proposicao` — o gabinete não numera nem autua.
+    Autor = vereador titular do gabinete.
     """
-    from sistema import fluxo as fluxo_mod
-
     _rascunho_do_setor(banco, rascunho_id, unidade_id)
-    tipo, subtipo, ementa, texto, justificativa = banco.execute(
-        "SELECT tipo, subtipo, ementa, texto, justificativa "
+    tipo, subtipo, texto, justificativa = banco.execute(
+        "SELECT tipo, subtipo, texto, justificativa "
         "FROM proposicao WHERE id = ?", (rascunho_id,),
     ).fetchone()
     meta = CATALOGO_PROPOSICOES[tipo]
     if not justificativa or not justificativa.strip():
         raise RegraViolada(
-            "a justificativa é obrigatória para protocolar (art. 88, §4º)")
+            "a justificativa é obrigatória para apresentar (art. 88, §4º)")
     if meta["exige_texto"] and (not texto or not texto.strip()):
         raise RegraViolada(
             "projetos exigem o texto articulado (art. 92)")
@@ -316,6 +325,51 @@ def protocolar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
         raise RegraViolada(
             f"{meta['nome']} exige a espécie (subtipo): "
             + ", ".join(meta["subtipos"]))
+    banco.execute(
+        "UPDATE proposicao SET situacao = 'APRESENTADA', "
+        "autor_parlamentar_id = ? WHERE id = ?",
+        (parlamentar_do_gabinete(banco, unidade_id), rascunho_id),
+    )
+    return "APRESENTADA"
+
+
+def proposicoes_apresentadas(banco: sqlite3.Connection) -> list[dict]:
+    """Proposições apresentadas aguardando autuação pelo Protocolo."""
+    return [
+        {"id": pid, "tipo": tipo, "nome": CATALOGO_PROPOSICOES.get(
+            tipo, {}).get("nome", tipo), "ementa": ementa, "regime": regime,
+         "autor": autor, "gabinete": gabinete}
+        for (pid, tipo, ementa, regime, autor, gabinete) in banco.execute(
+            """SELECT p.id, p.tipo, p.ementa, p.regime, pl.nome, u.nome
+                 FROM proposicao p
+                 LEFT JOIN parlamentar pl ON pl.id = p.autor_parlamentar_id
+                 LEFT JOIN unidade u ON u.id = p.unidade_autora_id
+                WHERE p.situacao = 'APRESENTADA'
+                ORDER BY p.id""",
+        )
+    ]
+
+
+def autuar_proposicao(banco: sqlite3.Connection, proposicao_id: int,
+                      unidade_protocolo_id: int, data: str) -> tuple[int, str]:
+    """O Protocolo AUTUA a proposição apresentada (art. 37).
+
+    Numera sequencialmente por tipo/ano, autua o processo com origem no
+    **Protocolo** e vincula o rito — a matéria nasce no Protocolo, que dá
+    o andamento inicial (encaminhamento ao setor seguinte do rito). Só
+    atua sobre proposição APRESENTADA.
+    """
+    from sistema import fluxo as fluxo_mod
+
+    linha = banco.execute(
+        "SELECT tipo, situacao, ementa FROM proposicao WHERE id = ?",
+        (proposicao_id,)).fetchone()
+    if linha is None:
+        raise RegraViolada("proposição inexistente")
+    tipo, situacao, ementa = linha
+    if situacao != "APRESENTADA":
+        raise RegraViolada(
+            "só se autua proposição apresentada pelo gabinete")
 
     ano = int(data[:4])
     (ultimo,) = banco.execute(
@@ -326,18 +380,31 @@ def protocolar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
     rotulo = f"{tipo} {numero}/{ano}"
 
     processo_id, _ = autuar_processo(
-        banco, "LEGISLATIVO", f"{rotulo} — {ementa}", unidade_id, data)
+        banco, "LEGISLATIVO", f"{rotulo} — {ementa}",
+        unidade_protocolo_id, data)
     if banco.execute("SELECT 1 FROM tipo_processo WHERE codigo = ?",
                      (tipo,)).fetchone():
         fluxo_mod.vincular_tipo(banco, processo_id, tipo)
 
     banco.execute(
         "UPDATE proposicao SET numero = ?, ano = ?, processo_id = ?, "
-        "autor_parlamentar_id = ?, situacao = 'EM_TRAMITACAO' WHERE id = ?",
-        (numero, ano, processo_id,
-         parlamentar_do_gabinete(banco, unidade_id), rascunho_id),
+        "situacao = 'EM_TRAMITACAO' WHERE id = ?",
+        (numero, ano, processo_id, proposicao_id),
     )
-    return rascunho_id, rotulo
+    return proposicao_id, rotulo
+
+
+def protocolar_rascunho(banco: sqlite3.Connection, rascunho_id: int,
+                        unidade_id: int, data: str) -> tuple[int, str]:
+    """Conveniência: o gabinete apresenta e o Protocolo autua, num passo.
+
+    Atalho programático (testes/cenário). Na operação real são dois atos
+    de setores distintos: `apresentar_rascunho` (gabinete) e
+    `autuar_proposicao` (Protocolo).
+    """
+    apresentar_rascunho(banco, rascunho_id, unidade_id)
+    return autuar_proposicao(
+        banco, rascunho_id, _unidade_protocolo(banco), data)
 
 
 # ------------------------------------------------------------------
@@ -904,7 +971,8 @@ def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
                      FROM proposicao a WHERE a.id = p.proposicao_alvo_id)
              FROM proposicao p
              LEFT JOIN processo pr ON pr.id = p.processo_id
-            WHERE p.situacao <> 'RASCUNHO' AND p.numero IS NOT NULL
+            WHERE p.situacao NOT IN ('RASCUNHO')
+              AND (p.numero IS NOT NULL OR p.situacao = 'APRESENTADA')
               AND (p.unidade_autora_id = ? OR pr.unidade_origem_id = ?)
             ORDER BY p.id DESC""", (unidade_id, unidade_id),
     ).fetchall()
@@ -915,6 +983,11 @@ def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
          situacao_processo, localizacao, prazo_pendente, alvo) in linhas:
         pareceres = comissoes.pareceres(banco, pid)
         alertas, acoes = [], []
+        if situacao == "APRESENTADA":
+            alertas.append({
+                "tipo": "APRESENTADA",
+                "mensagem": "Apresentada — aguardando autuação e numeração "
+                            "pelo Protocolo (art. 37)"})
         recurso_disponivel = False
         recusa = _recusa_ativa(banco, pid)
         recusa_info = None
@@ -995,8 +1068,9 @@ def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
             for e in emendas_da_proposicao(banco, pid)
         ] if tipo in TIPOS_EMENDAVEIS else []
 
+        rotulo = f"{tipo} {numero}/{ano}" if numero else f"{tipo} (apresentada)"
         resultado.append({
-            "id": pid, "rotulo": f"{tipo} {numero}/{ano}", "tipo": tipo,
+            "id": pid, "rotulo": rotulo, "tipo": tipo,
             "subtipo": subtipo, "ementa": ementa, "regime": regime,
             "situacao": situacao, "situacao_processo": situacao_processo,
             "localizacao": localizacao, "pareceres": pareceres,
@@ -1040,8 +1114,9 @@ def pautar(banco: sqlite3.Connection, sessao_id: int, proposicao_id: int,
     if linha is None:
         raise RegraViolada("proposição inexistente")
     tipo_proposicao, situacao_proposicao = linha
-    if situacao_proposicao == "RASCUNHO":
-        raise RegraViolada("rascunho não protocolado não entra em pauta")
+    if situacao_proposicao in ("RASCUNHO", "APRESENTADA"):
+        raise RegraViolada(
+            "proposição sem autuação do Protocolo não entra em pauta")
     if situacao_proposicao in ("RECUSADA", "EM_RECURSO", "RETIRADA"):
         raise RegraViolada(
             "matéria recusada, em recurso ou retirada não entra em pauta")

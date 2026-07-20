@@ -91,6 +91,7 @@ class TestGabinete(unittest.TestCase):
 
     def test_protocolo_numera_autua_e_define_autor(self):
         rid = self._rascunho_completo()
+        # protocolar_rascunho = conveniência (apresenta + o Protocolo autua)
         _, rotulo = legislativo.protocolar_rascunho(
             self.banco, rid, self.gab, "2025-09-10")
         self.assertEqual(rotulo, "PL 1/2025")
@@ -100,14 +101,49 @@ class TestGabinete(unittest.TestCase):
         self.assertEqual(situacao, "EM_TRAMITACAO")
         self.assertEqual(
             autor, legislativo.parlamentar_do_gabinete(self.banco, self.gab))
-        # processo autuado com origem no gabinete e vinculado ao rito PL
+        # o processo NASCE no Protocolo (art. 37), não no gabinete
+        protocolo = self.banco.execute(
+            "SELECT id FROM unidade WHERE nome = "
+            "'Coordenadoria da Secretaria-Geral'").fetchone()[0]
         origem, tipo_processo = self.banco.execute(
             "SELECT unidade_origem_id, tipo_processo_id FROM processo "
             "WHERE id = ?", (processo_id,)).fetchone()
-        self.assertEqual(origem, self.gab)
+        self.assertEqual(origem, protocolo)
         self.assertIsNotNone(tipo_processo)
+        # estando no Protocolo (etapa 2 do rito), o andamento inicial segue
+        # para a Consultoria-Geral (etapa 3)
         prox = fluxo.proxima_etapa(self.banco, processo_id)
-        self.assertEqual(prox["unidade"], "Coordenadoria da Secretaria-Geral")
+        self.assertEqual(prox["unidade"], "Consultoria-Geral Legislativa")
+
+    def test_apresentar_e_autuar_sao_atos_de_setores_distintos(self):
+        rid = self._rascunho_completo()
+        # gabinete apresenta: sem número, situação APRESENTADA
+        legislativo.apresentar_rascunho(self.banco, rid, self.gab)
+        numero, situacao = self.banco.execute(
+            "SELECT numero, situacao FROM proposicao WHERE id = ?",
+            (rid,)).fetchone()
+        self.assertIsNone(numero)
+        self.assertEqual(situacao, "APRESENTADA")
+        # aparece na fila de autuação do Protocolo
+        self.assertIn(rid, [p["id"] for p in
+                            legislativo.proposicoes_apresentadas(self.banco)])
+        # Protocolo autua: numera e o processo nasce no Protocolo
+        protocolo = self.banco.execute(
+            "SELECT id FROM unidade WHERE nome = "
+            "'Coordenadoria da Secretaria-Geral'").fetchone()[0]
+        _, rotulo = legislativo.autuar_proposicao(
+            self.banco, rid, protocolo, "2025-09-10")
+        self.assertEqual(rotulo, "PL 1/2025")
+        self.assertEqual([], legislativo.proposicoes_apresentadas(self.banco))
+
+    def test_nao_se_autua_o_que_nao_foi_apresentado(self):
+        rid = self._rascunho_completo()  # ainda RASCUNHO
+        protocolo = self.banco.execute(
+            "SELECT id FROM unidade WHERE nome = "
+            "'Coordenadoria da Secretaria-Geral'").fetchone()[0]
+        with self.assertRaises(RegraViolada):
+            legislativo.autuar_proposicao(
+                self.banco, rid, protocolo, "2025-09-10")
 
     def test_protocolo_exige_justificativa(self):
         rid = legislativo.criar_rascunho(
