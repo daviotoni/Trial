@@ -678,6 +678,25 @@ class Aplicacao:
     def painel(self):
         return transparencia.painel(self.banco)
 
+    def saude(self):
+        # Diagnóstico público: diz qual banco a instância no ar está usando.
+        # 'postgres' confirma que a DATABASE_URL do Supabase está ativa e os
+        # dados persistem; 'sqlite' indica que o app caiu no banco efêmero
+        # (a variável não chegou ao processo). Sem segredos: só o backend e
+        # contagens agregadas.
+        eh_postgres = type(self.banco).__name__ == "ConexaoPostgres"
+        (unidades,) = self.banco.execute(
+            "SELECT COUNT(*) FROM unidade").fetchone()
+        (usuarios,) = self.banco.execute(
+            "SELECT COUNT(*) FROM usuario").fetchone()
+        return {
+            "ok": True,
+            "backend": "postgres" if eh_postgres else "sqlite",
+            "persistente": eh_postgres,
+            "unidades": unidades,
+            "usuarios": usuarios,
+        }
+
 
 # (método, padrão, área exigida, ação). Área None = rota pública —
 # consultas de transparência ativa são abertas por princípio (LAI).
@@ -779,6 +798,7 @@ ROTAS = [
      lambda app, m, d: app.pendencias()),
     ("GET", r"^/auditoria$", "CONTROLE", lambda app, m, d: app.auditoria()),
     ("GET", r"^/painel$", None, lambda app, m, d: app.painel()),
+    ("GET", r"^/saude$", None, lambda app, m, d: app.saude()),
 ]
 
 
