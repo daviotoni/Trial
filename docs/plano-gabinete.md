@@ -84,11 +84,20 @@ gabinetes como unidades de assessoramento ao mandato).
 - Justificativa ausente bloqueia o protocolo (não o rascunho).
 - Nada disso aparece para logins de outros setores.
 
+## Implementado além do Bloco 1
+
+- **Bloco 4** (acompanhamento rico, requerimentos derivados e despacho do
+  Presidente — arts. 90, 93-95 e 107-113).
+- **Bloco 3** (emendas a matéria alheia — arts. 114-115).
+- **Recusa formal da Presidência com recurso à CLJRF** (art. 88, §1º): o
+  Presidente recebe ou recusa a proposição; da recusa cabe recurso do
+  autor à Comissão de Legislação, Justiça e Redação Final, que mantém
+  (recusa definitiva) ou reverte (matéria readmitida). Tabela `recusa`.
+
 ## Fora de escopo nesta fase (anotado para o futuro)
 
 - Assinatura digital de coautoria/apoiamento, com mínimos por tipo
   (art. 88 §6º: CPI e urgência = 1/3; votação secreta; títulos
-  honoríficos = 1/3; moção de desaprovação = 1/3 etc.).
+  honoríficos = 1/3; moção de desaprovação = 1/3 etc.) — **Bloco 2**.
 - Logins de assessores com papéis internos (redator × signatário).
-- Recusa formal pela Presidência com recurso à CLJRF (art. 88 §1º).
 - Regras de fim de legislatura (art. 95) e vedação do art. 94.

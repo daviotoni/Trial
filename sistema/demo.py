@@ -92,6 +92,12 @@ def criar_banco(caminho: str = ":memory:",
         conexao.execute(
             "INSERT OR IGNORE INTO unidade_acao (unidade_id, acao) "
             "SELECT id, 'DESPACHAR' FROM unidade WHERE nome = 'Presidência'")
+        for tabela, ddl in bancodados.TABELAS_NOVAS_SQLITE.items():
+            existe = conexao.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+                "AND name = ?", (tabela,)).fetchone()
+            if not existe:
+                conexao.executescript(ddl)
     return conexao
 
 

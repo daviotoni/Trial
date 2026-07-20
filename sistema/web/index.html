@@ -80,6 +80,7 @@
   <button data-aba="nova-proposicao" data-area="acao:APRESENTAR_PROPOSICAO">Nova proposição</button>
   <button data-aba="emendar" data-area="acao:APRESENTAR_PROPOSICAO">Emendar</button>
   <button data-aba="despachos" data-area="acao:DESPACHAR">Despachos</button>
+  <button data-aba="recursos" data-area="acao:EMITIR_PARECER">Recursos (CLJRF)</button>
   <button data-aba="cargos" data-area="PESSOAL">Cargos e vagas</button>
   <button data-aba="protocolo" data-area="PROTOCOLO">Protocolo</button>
   <button data-aba="plenario" data-area="LEGISLATIVO">Plenário</button>
@@ -162,6 +163,33 @@
       <tbody></tbody>
     </table>
     <p id="msg-despacho" class="msg"></p>
+  </div>
+  <div class="cartao">
+    <h2>Recebimento de proposições (art. 88, §1º)</h2>
+    <p style="color:#555">O Presidente <b>recebe ou recusa</b> as matérias. Não recusar equivale a receber.
+      Da recusa cabe recurso do autor à CLJRF. Recuse apenas com fundamentação (matéria estranha à
+      ementa, inconstitucionalidade, matéria já rejeitada etc.).</p>
+    <p id="recebimento-vazio" style="display:none; color:#555">Nenhuma matéria aguardando recebimento.</p>
+    <table id="tabela-recebimento" style="display:none">
+      <thead><tr><th>Proposição</th><th>Ementa</th><th>Autor</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="msg-recebimento" class="msg"></p>
+  </div>
+</section>
+
+<section id="recursos">
+  <div class="cartao">
+    <h2>Recursos à CLJRF (art. 88, §1º)</h2>
+    <p style="color:#555">Recursos contra a recusa da Presidência, para decisão da Comissão de
+      Legislação, Justiça e Redação Final. <b>Prover</b> readmite a matéria (volta a tramitar);
+      <b>negar</b> mantém a recusa em definitivo.</p>
+    <p id="recursos-vazio" style="display:none; color:#555">Nenhum recurso aguardando decisão.</p>
+    <table id="tabela-recursos" style="display:none">
+      <thead><tr><th>Proposição</th><th>Recusa da Presidência</th><th>Razões do recurso</th><th>Autor</th><th>Decisão</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="msg-recurso" class="msg"></p>
   </div>
 </section>
 
@@ -599,6 +627,23 @@ const carregarProposicoes = async () => {
           b.addEventListener("click", () => pedirRequerimento(p.id, f));
           tr.lastChild.appendChild(b);
         });
+        if (p.recurso_disponivel) {
+          const b = document.createElement("button");
+          b.className = "acao"; b.style.display = "block";
+          b.style.marginBottom = "4px";
+          b.textContent = "Recorrer à CLJRF";
+          b.addEventListener("click", async () => {
+            const razoes = prompt(
+              `Recurso contra a recusa de ${p.rotulo} — razões (art. 88, §1º):`);
+            if (razoes === null) return;
+            try {
+              await enviar(`/proposicoes/${p.id}/recurso`, {razoes});
+              mostrar("msg-prop", `Recurso de ${p.rotulo} protocolado.`, "ok");
+              carregarProposicoes();
+            } catch (e) { mostrar("msg-prop", e.message, "erro"); }
+          });
+          tr.lastChild.appendChild(b);
+        }
       }
       corpo.appendChild(tr);
     });
@@ -664,6 +709,88 @@ document.getElementById("btn-apresentar-emenda").addEventListener("click", async
     carregarProposicoes();
   } catch (e) { mostrar("msg-emenda", e.message, "erro"); }
 });
+
+// Recebimento/recusa da Presidência (art. 88, §1º)
+const carregarRecebimento = async () => {
+  const tabela = document.getElementById("tabela-recebimento");
+  const corpo = tabela.querySelector("tbody");
+  const vazio = document.getElementById("recebimento-vazio");
+  try {
+    const lista = await consultar("/recebimento");
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazio.style.display = ""; return;
+    }
+    vazio.style.display = "none"; tabela.style.display = "";
+    lista.forEach(p => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${p.rotulo}</td><td>${p.ementa}</td>` +
+        `<td>${p.autor || p.gabinete || "—"}</td><td></td>`;
+      const b = document.createElement("button");
+      b.className = "acao"; b.style.background = "#a33";
+      b.textContent = "Recusar";
+      b.addEventListener("click", async () => {
+        const motivo = prompt(
+          `Recusar ${p.rotulo} — fundamentação (art. 88, §1º):`);
+        if (motivo === null) return;
+        try {
+          await enviar(`/proposicoes/${p.id}/recusa`, {motivo});
+          mostrar("msg-recebimento", `${p.rotulo} recusada.`, "ok");
+          carregarRecebimento();
+        } catch (e) { mostrar("msg-recebimento", e.message, "erro"); }
+      });
+      tr.lastChild.appendChild(b);
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazio.style.display = "";
+    vazio.textContent = e.message;
+  }
+};
+
+// Recursos à CLJRF (art. 88, §1º) — decisão do setor de comissões
+const carregarRecursos = async () => {
+  const tabela = document.getElementById("tabela-recursos");
+  const corpo = tabela.querySelector("tbody");
+  const vazio = document.getElementById("recursos-vazio");
+  try {
+    const lista = await consultar("/recursos");
+    corpo.innerHTML = "";
+    if (!lista.length) {
+      tabela.style.display = "none"; vazio.style.display = ""; return;
+    }
+    vazio.style.display = "none"; tabela.style.display = "";
+    lista.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${r.rotulo}<br><small>${r.ementa}</small></td>` +
+        `<td>${r.motivo}</td><td>${r.recurso_razoes || "—"}</td>` +
+        `<td>${r.autor || r.gabinete || "—"}</td><td></td>`;
+      [["Prover", true, ""], ["Negar", false, "#666"]].forEach(
+        ([rotulo, provido, cor]) => {
+          const b = document.createElement("button");
+          b.className = "acao"; b.textContent = rotulo;
+          b.style.marginRight = "6px"; if (cor) b.style.background = cor;
+          b.addEventListener("click", async () => {
+            const motivo = prompt(`${rotulo} o recurso — fundamentação (opcional):`,
+              provido ? "Recurso procedente." : "Recurso improcedente.");
+            if (motivo === null) return;
+            try {
+              await enviar(`/proposicoes/${r.id}/recurso-decisao`,
+                           {provido, motivo});
+              mostrar("msg-recurso",
+                `${r.rotulo}: recurso ${provido ? "provido" : "negado"}.`, "ok");
+              carregarRecursos();
+            } catch (e) { mostrar("msg-recurso", e.message, "erro"); }
+          });
+          tr.lastChild.appendChild(b);
+        });
+      corpo.appendChild(tr);
+    });
+  } catch (e) {
+    tabela.style.display = "none"; vazio.style.display = "";
+    vazio.textContent = e.message;
+  }
+};
 
 // Despachos do Presidente (arts. 108-110)
 const carregarDespachos = async () => {
@@ -1040,8 +1167,9 @@ document.getElementById("menu").addEventListener("click", (evento) => {
   if (aba === "nova-proposicao") { carregarCatalogoNP(); carregarRascunhos(); }
   // Acompanhamento sempre fresco; despachos pendentes da Presidência.
   if (aba === "proposicoes-setor") carregarProposicoes();
-  if (aba === "despachos") carregarDespachos();
+  if (aba === "despachos") { carregarDespachos(); carregarRecebimento(); }
   if (aba === "emendar") carregarEmendaveis();
+  if (aba === "recursos") carregarRecursos();
 });
 
 // Painel

@@ -556,6 +556,43 @@ class Aplicacao:
         autenticacao.exigir_acao(self.banco, self.usuario_atual, "DESPACHAR")
         return legislativo.despachos_pendentes(self.banco)
 
+    # ------------- recusa da Presidência e recurso à CLJRF -----------
+
+    def proposicoes_para_recebimento(self):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual, "DESPACHAR")
+        return legislativo.proposicoes_para_recebimento(self.banco)
+
+    def recusar_proposicao(self, proposicao_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual, "DESPACHAR")
+        rotulo = legislativo.recusar_proposicao(
+            self.banco, proposicao_id, dados.get("motivo", ""),
+            dados.get("data") or _hoje())
+        self.banco.commit()
+        return {"id": proposicao_id, "rotulo": rotulo, "situacao": "RECUSADA"}
+
+    def recorrer_da_recusa(self, proposicao_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "APRESENTAR_PROPOSICAO")
+        situacao = legislativo.recorrer_da_recusa(
+            self.banco, proposicao_id, self._unidade_do_usuario(),
+            dados.get("razoes", ""), dados.get("data") or _hoje())
+        self.banco.commit()
+        return {"id": proposicao_id, "situacao": situacao}
+
+    def recursos_pendentes(self):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "EMITIR_PARECER")
+        return legislativo.recursos_pendentes(self.banco)
+
+    def decidir_recurso(self, proposicao_id: int, dados):
+        autenticacao.exigir_acao(self.banco, self.usuario_atual,
+                                 "EMITIR_PARECER")
+        resultado = legislativo.decidir_recurso(
+            self.banco, proposicao_id, bool(dados.get("provido")),
+            dados.get("data") or _hoje(), dados.get("motivo"))
+        self.banco.commit()
+        return {"id": proposicao_id, "resultado": resultado}
+
     def despachar_requerimento(self, requerimento_id: int, dados):
         autenticacao.exigir_acao(self.banco, self.usuario_atual, "DESPACHAR")
         resultado = legislativo.despachar_requerimento(
@@ -848,6 +885,16 @@ ROTAS = [
      lambda app, m, d: app.despachos_pendentes()),
     ("POST", r"^/requerimentos/(\d+)/despacho$", "LEGISLATIVO",
      lambda app, m, d: app.despachar_requerimento(int(m.group(1)), d)),
+    ("GET", r"^/recebimento$", "LEGISLATIVO",
+     lambda app, m, d: app.proposicoes_para_recebimento()),
+    ("POST", r"^/proposicoes/(\d+)/recusa$", "LEGISLATIVO",
+     lambda app, m, d: app.recusar_proposicao(int(m.group(1)), d)),
+    ("POST", r"^/proposicoes/(\d+)/recurso$", "LEGISLATIVO",
+     lambda app, m, d: app.recorrer_da_recusa(int(m.group(1)), d)),
+    ("GET", r"^/recursos$", "LEGISLATIVO",
+     lambda app, m, d: app.recursos_pendentes()),
+    ("POST", r"^/proposicoes/(\d+)/recurso-decisao$", "LEGISLATIVO",
+     lambda app, m, d: app.decidir_recurso(int(m.group(1)), d)),
     ("GET", r"^/rascunhos$", "*", lambda app, m, d: app.listar_rascunhos()),
     ("POST", r"^/rascunhos$", "LEGISLATIVO",
      lambda app, m, d: app.criar_rascunho(d)),

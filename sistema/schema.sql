@@ -358,6 +358,30 @@ CREATE TABLE parecer (
 );
 
 -- ============================================================
+-- Módulo 5c: Recebimento/recusa da Presidência e recurso à CLJRF
+-- ============================================================
+-- Art. 88, §1º do Regimento Interno: o Presidente RECEBE ou RECUSA a
+-- proposição (matéria estranha à ementa, inconstitucionalidade, matéria
+-- já rejeitada etc.). Da recusa cabe RECURSO do autor à Comissão de
+-- Legislação, Justiça e Redação Final (CLJRF), que a MANTÉM (recusa
+-- definitiva) ou a REVERTE (a matéria volta a tramitar).
+CREATE TABLE recusa (
+    id             INTEGER PRIMARY KEY,
+    proposicao_id  INTEGER NOT NULL REFERENCES proposicao (id),
+    motivo         TEXT NOT NULL,          -- fundamentação do Presidente
+    data           TEXT NOT NULL,
+    recurso_razoes TEXT,                   -- razões do recurso do autor
+    recurso_data   TEXT,
+    decisao        TEXT CHECK (decisao IN ('PROVIDO', 'NEGADO')),
+    decisao_motivo TEXT,                   -- fundamentação da CLJRF
+    decisao_data   TEXT,
+    situacao       TEXT NOT NULL DEFAULT 'RECUSADA' CHECK (situacao IN
+                     ('RECUSADA', 'EM_RECURSO', 'MANTIDA', 'REVERTIDA'))
+);
+
+CREATE INDEX idx_recusa_proposicao ON recusa (proposicao_id);
+
+-- ============================================================
 -- Módulo 6: Compras, contratos e execução (Lei 14.133/2021)
 -- ============================================================
 

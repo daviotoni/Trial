@@ -470,6 +470,170 @@ def proposicoes_protocoladas(banco: sqlite3.Connection) -> list[dict]:
 
 
 # ------------------------------------------------------------------
+# Recebimento/recusa da Presidência e recurso à CLJRF (art. 88, §1º)
+# ------------------------------------------------------------------
+
+def recusar_proposicao(banco: sqlite3.Connection, proposicao_id: int,
+                       motivo: str, data: str) -> str:
+    """Recusa formal da Presidência (art. 88, §1º). Devolve o rótulo.
+
+    Cabe a matéria em tramitação (não a requerimento, que se resolve por
+    despacho). A proposição vai a RECUSADA e o processo é arquivado; da
+    recusa cabe recurso do autor à CLJRF. Uma proposição só passa uma vez
+    pelo juízo de admissibilidade.
+    """
+    if not motivo or not motivo.strip():
+        raise RegraViolada("a recusa exige fundamentação (art. 88, §1º)")
+    linha = banco.execute(
+        "SELECT tipo, numero, ano, situacao, processo_id FROM proposicao "
+        "WHERE id = ?", (proposicao_id,)).fetchone()
+    if linha is None or linha[1] is None:
+        raise RegraViolada("proposição inexistente ou não protocolada")
+    tipo, numero, ano, situacao, processo_id = linha
+    if tipo == "REQUERIMENTO":
+        raise RegraViolada(
+            "requerimento sujeita-se a despacho do Presidente, não à recusa")
+    if situacao != "EM_TRAMITACAO":
+        raise RegraViolada("só cabe recusar matéria em tramitação")
+    if banco.execute("SELECT 1 FROM recusa WHERE proposicao_id = ?",
+                     (proposicao_id,)).fetchone():
+        raise RegraViolada(
+            "a proposição já passou pelo juízo de admissibilidade da "
+            "Presidência")
+    banco.execute(
+        "INSERT INTO recusa (proposicao_id, motivo, data, situacao) "
+        "VALUES (?, ?, ?, 'RECUSADA')", (proposicao_id, motivo.strip(), data))
+    banco.execute("UPDATE proposicao SET situacao = 'RECUSADA' WHERE id = ?",
+                  (proposicao_id,))
+    if processo_id:
+        (situacao_processo,) = banco.execute(
+            "SELECT situacao FROM processo WHERE id = ?",
+            (processo_id,)).fetchone()
+        if situacao_processo in ("EM_TRAMITACAO", "SOBRESTADO", "CONCLUIDO"):
+            arquivar_processo(banco, processo_id)
+    return f"{tipo} {numero}/{ano}"
+
+
+def _recusa_ativa(banco, proposicao_id):
+    return banco.execute(
+        "SELECT id, motivo, data, recurso_razoes, decisao, decisao_motivo, "
+        "situacao FROM recusa WHERE proposicao_id = ? ORDER BY id DESC "
+        "LIMIT 1", (proposicao_id,)).fetchone()
+
+
+def recorrer_da_recusa(banco: sqlite3.Connection, proposicao_id: int,
+                       unidade_id: int, razoes: str, data: str) -> str:
+    """Recurso do autor à CLJRF contra a recusa (art. 88, §1º).
+
+    Só o autor da matéria e só enquanto a recusa não foi recorrida. A
+    proposição vai a EM_RECURSO e aguarda a decisão da Comissão de
+    Legislação, Justiça e Redação Final.
+    """
+    if not razoes or not razoes.strip():
+        raise RegraViolada("o recurso exige as razões (art. 88, §1º)")
+    recusa = _recusa_ativa(banco, proposicao_id)
+    if recusa is None or recusa[6] != "RECUSADA":
+        raise RegraViolada(
+            "não há recusa pendente de recurso para esta proposição")
+    autora, autor_parlamentar = banco.execute(
+        "SELECT unidade_autora_id, autor_parlamentar_id FROM proposicao "
+        "WHERE id = ?", (proposicao_id,)).fetchone()
+    titular = parlamentar_do_gabinete(banco, unidade_id)
+    if autora != unidade_id and (autor_parlamentar is None
+                                 or autor_parlamentar != titular):
+        raise RegraViolada("só o autor pode recorrer da recusa")
+    banco.execute(
+        "UPDATE recusa SET recurso_razoes = ?, recurso_data = ?, "
+        "situacao = 'EM_RECURSO' WHERE id = ?",
+        (razoes.strip(), data, recusa[0]))
+    banco.execute("UPDATE proposicao SET situacao = 'EM_RECURSO' WHERE id = ?",
+                  (proposicao_id,))
+    return "EM_RECURSO"
+
+
+def decidir_recurso(banco: sqlite3.Connection, proposicao_id: int,
+                    provido: bool, data: str, motivo: str | None = None) -> str:
+    """Decisão da CLJRF sobre o recurso (art. 88, §1º).
+
+    PROVIDO reverte a recusa: a proposição volta a tramitar e o processo
+    é desarquivado. NEGADO mantém a recusa (definitiva). Devolve
+    'PROVIDO' ou 'NEGADO'.
+    """
+    recusa = _recusa_ativa(banco, proposicao_id)
+    if recusa is None or recusa[6] != "EM_RECURSO":
+        raise RegraViolada("não há recurso pendente de decisão")
+    (processo_id,) = banco.execute(
+        "SELECT processo_id FROM proposicao WHERE id = ?",
+        (proposicao_id,)).fetchone()
+    if provido:
+        banco.execute(
+            "UPDATE recusa SET decisao = 'PROVIDO', decisao_motivo = ?, "
+            "decisao_data = ?, situacao = 'REVERTIDA' WHERE id = ?",
+            (motivo, data, recusa[0]))
+        banco.execute(
+            "UPDATE proposicao SET situacao = 'EM_TRAMITACAO' WHERE id = ?",
+            (proposicao_id,))
+        if processo_id:
+            (situacao_processo,) = banco.execute(
+                "SELECT situacao FROM processo WHERE id = ?",
+                (processo_id,)).fetchone()
+            if situacao_processo == "ARQUIVADO":
+                desarquivar_processo(banco, processo_id)
+        return "PROVIDO"
+    banco.execute(
+        "UPDATE recusa SET decisao = 'NEGADO', decisao_motivo = ?, "
+        "decisao_data = ?, situacao = 'MANTIDA' WHERE id = ?",
+        (motivo, data, recusa[0]))
+    banco.execute("UPDATE proposicao SET situacao = 'RECUSADA' WHERE id = ?",
+                  (proposicao_id,))
+    return "NEGADO"
+
+
+def proposicoes_para_recebimento(banco: sqlite3.Connection) -> list[dict]:
+    """Matérias em tramitação que a Presidência ainda pode receber/recusar."""
+    return [
+        {"id": pid, "rotulo": f"{tipo} {numero}/{ano}", "tipo": tipo,
+         "ementa": ementa, "autor": autor, "gabinete": gabinete,
+         "regime": regime}
+        for (pid, tipo, numero, ano, ementa, autor, gabinete, regime) in
+        banco.execute(
+            """SELECT p.id, p.tipo, p.numero, p.ano, p.ementa, pl.nome,
+                      u.nome, p.regime
+                 FROM proposicao p
+                 LEFT JOIN parlamentar pl ON pl.id = p.autor_parlamentar_id
+                 LEFT JOIN unidade u ON u.id = p.unidade_autora_id
+                WHERE p.situacao = 'EM_TRAMITACAO' AND p.tipo <> 'REQUERIMENTO'
+                  AND p.numero IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM recusa r
+                                   WHERE r.proposicao_id = p.id)
+                ORDER BY p.id DESC""",
+        )
+    ]
+
+
+def recursos_pendentes(banco: sqlite3.Connection) -> list[dict]:
+    """Recursos aguardando decisão da CLJRF (setor de comissões)."""
+    return [
+        {"id": pid, "rotulo": f"{tipo} {numero}/{ano}", "ementa": ementa,
+         "autor": autor, "gabinete": gabinete, "motivo": motivo,
+         "recurso_razoes": razoes, "recusa_data": data,
+         "recurso_data": recurso_data}
+        for (pid, tipo, numero, ano, ementa, autor, gabinete, motivo,
+             razoes, data, recurso_data) in banco.execute(
+            """SELECT p.id, p.tipo, p.numero, p.ano, p.ementa, pl.nome,
+                      u.nome, r.motivo, r.recurso_razoes, r.data,
+                      r.recurso_data
+                 FROM recusa r
+                 JOIN proposicao p ON p.id = r.proposicao_id
+                 LEFT JOIN parlamentar pl ON pl.id = p.autor_parlamentar_id
+                 LEFT JOIN unidade u ON u.id = p.unidade_autora_id
+                WHERE r.situacao = 'EM_RECURSO'
+                ORDER BY r.id""",
+        )
+    ]
+
+
+# ------------------------------------------------------------------
 # Bloco 4: requerimentos derivados, despacho do Presidente e
 # acompanhamento (arts. 90, 93-95 e 107-113 do Regimento Interno)
 # ------------------------------------------------------------------
@@ -751,8 +915,36 @@ def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
          situacao_processo, localizacao, prazo_pendente, alvo) in linhas:
         pareceres = comissoes.pareceres(banco, pid)
         alertas, acoes = [], []
+        recurso_disponivel = False
+        recusa = _recusa_ativa(banco, pid)
+        recusa_info = None
+        if recusa:
+            recusa_info = {"motivo": recusa[1], "situacao": recusa[6],
+                           "decisao": recusa[4],
+                           "decisao_motivo": recusa[5]}
+            if recusa[6] == "RECUSADA":
+                alertas.append({
+                    "tipo": "RECUSADA",
+                    "mensagem": f"Recusada pela Presidência: {recusa[1]} — "
+                                "cabe recurso à CLJRF (art. 88, §1º)"})
+                recurso_disponivel = True
+            elif recusa[6] == "EM_RECURSO":
+                alertas.append({
+                    "tipo": "EM_RECURSO",
+                    "mensagem": "Em recurso à CLJRF (aguarda decisão)"})
+            elif recusa[6] == "MANTIDA":
+                alertas.append({
+                    "tipo": "RECUSA_MANTIDA",
+                    "mensagem": "Recusa mantida pela CLJRF — matéria "
+                                "definitivamente rejeitada (art. 88, §1º)"})
+            elif recusa[6] == "REVERTIDA":
+                alertas.append({
+                    "tipo": "RECUSA_REVERTIDA",
+                    "mensagem": "Recurso provido pela CLJRF — matéria "
+                                "readmitida e de volta à tramitação"})
 
-        if situacao_processo == "ARQUIVADO" and situacao != "RETIRADA":
+        if situacao_processo == "ARQUIVADO" and situacao not in (
+                "RETIRADA", "RECUSADA", "EM_RECURSO"):
             alertas.append({
                 "tipo": "ARQUIVADA",
                 "mensagem": "Processo arquivado — cabe requerimento de "
@@ -771,7 +963,11 @@ def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
                                 f"{parecer['tipo'].lower()} "
                                 f"({parecer['situacao'].lower()})"})
 
-        if not finalidade:  # requerimento derivado não deriva outro
+        # Matéria em ciclo de recusa/recurso não aceita requerimento
+        # comum — só o recurso à CLJRF a move (art. 88, §1º).
+        em_recusa = recusa_info is not None and recusa_info["situacao"] in (
+            "RECUSADA", "EM_RECURSO", "MANTIDA")
+        if not finalidade and not em_recusa:  # requerimento não deriva outro
             if situacao_processo == "ARQUIVADO":
                 acoes.append("DESARQUIVAMENTO")
             elif situacao == "EM_TRAMITACAO" and \
@@ -809,6 +1005,7 @@ def acompanhamento_do_gabinete(banco: sqlite3.Connection, unidade_id: int,
             "despacho_data": despacho_data,
             "requerimentos_pendentes": pendentes,
             "emendas": emendas,
+            "recusa": recusa_info, "recurso_disponivel": recurso_disponivel,
         })
     return resultado
 
@@ -845,6 +1042,9 @@ def pautar(banco: sqlite3.Connection, sessao_id: int, proposicao_id: int,
     tipo_proposicao, situacao_proposicao = linha
     if situacao_proposicao == "RASCUNHO":
         raise RegraViolada("rascunho não protocolado não entra em pauta")
+    if situacao_proposicao in ("RECUSADA", "EM_RECURSO", "RETIRADA"):
+        raise RegraViolada(
+            "matéria recusada, em recurso ou retirada não entra em pauta")
     if not urgencia and comissoes.exige_parecer(tipo_proposicao) \
             and not comissoes.tem_parecer_aprovado(banco, proposicao_id):
         raise RegraViolada(
