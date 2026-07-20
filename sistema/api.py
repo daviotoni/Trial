@@ -112,13 +112,56 @@ class Aplicacao:
         return {"id": uid}
 
     def listar_usuarios(self):
+        # Inclui os desativados: a tela de gestão precisa vê-los para
+        # reativar. `ativo` diferencia na interface.
         return [
-            {"login": login, "perfil": perfil, "unidade": unidade}
-            for login, perfil, unidade in self.banco.execute(
-                """SELECT u.login, u.perfil, un.nome
+            {"id": uid, "login": login, "perfil": perfil,
+             "unidade": unidade, "unidade_id": unidade_id, "ativo": ativo}
+            for uid, login, perfil, unidade, unidade_id, ativo in
+            self.banco.execute(
+                """SELECT u.id, u.login, u.perfil, un.nome, u.unidade_id,
+                          u.ativo
                      FROM usuario u LEFT JOIN unidade un ON un.id = u.unidade_id
-                    WHERE u.ativo = 1 ORDER BY u.login""")
+                    ORDER BY u.ativo DESC, u.login""")
         ]
+
+    def _alvo_gestao_usuario(self, usuario_id):
+        """Regra de gestão: contas ADMIN só são geridas por outro ADMIN."""
+        linha = self.banco.execute(
+            "SELECT perfil FROM usuario WHERE id = ?", (usuario_id,)
+        ).fetchone()
+        if linha is None:
+            raise Recurso404()
+        if linha[0] == "ADMIN" and self.usuario_atual["perfil"] != "ADMIN":
+            raise AcessoNegado(
+                "contas de administrador só podem ser alteradas por outro "
+                "administrador")
+
+    def editar_usuario(self, usuario_id: int, dados):
+        """Edita o acesso: setor (unidade_id), senha e/ou ativo (0/1)."""
+        self._alvo_gestao_usuario(usuario_id)
+        try:
+            login = autenticacao.atualizar_usuario(
+                self.banco, usuario_id,
+                unidade_id=(dados["unidade_id"] if "unidade_id" in dados
+                            else ...),
+                senha=dados.get("senha"), ativo=dados.get("ativo"))
+        except ValueError as erro:
+            raise RegraViolada(str(erro))
+        self.banco.commit()
+        # O acesso mudou: derruba as sessões abertas desse login.
+        self.sessoes.encerrar_do_login(login)
+        return {"id": usuario_id, "login": login}
+
+    def excluir_usuario(self, usuario_id: int):
+        self._alvo_gestao_usuario(usuario_id)
+        try:
+            login = autenticacao.excluir_usuario(self.banco, usuario_id)
+        except ValueError as erro:
+            raise RegraViolada(str(erro))
+        self.banco.commit()
+        self.sessoes.encerrar_do_login(login)
+        return {"id": usuario_id, "login": login, "excluido": True}
 
     def eu(self):
         """Identidade e alçada do usuário logado (para a interface)."""
@@ -740,6 +783,10 @@ ROTAS = [
     ("POST", r"^/login$", None, lambda app, m, d: app.login(d)),
     ("POST", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.criar_usuario(d)),
     ("GET", r"^/usuarios$", "USUARIOS", lambda app, m, d: app.listar_usuarios()),
+    ("POST", r"^/usuarios/(\d+)$", "USUARIOS",
+     lambda app, m, d: app.editar_usuario(int(m.group(1)), d)),
+    ("POST", r"^/usuarios/(\d+)/exclusao$", "USUARIOS",
+     lambda app, m, d: app.excluir_usuario(int(m.group(1)))),
     ("GET", r"^/me$", "*", lambda app, m, d: app.eu()),
     ("GET", r"^/caixa$", "*", lambda app, m, d: app.caixa()),
     ("GET", r"^/minhas-proposicoes$", "*",

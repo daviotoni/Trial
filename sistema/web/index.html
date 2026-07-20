@@ -194,11 +194,15 @@
   </div>
   <div class="cartao">
     <h2>Logins existentes</h2>
+    <p style="color:#555">Edite o acesso de cada login: trocar o setor muda o que ele pode fazer;
+      desativar suspende sem apagar; excluir remove de vez. Quem tem a sessão aberta é
+      desconectado na hora em que o acesso muda.</p>
     <button class="acao" id="btn-recarregar-usuarios" style="margin-bottom:8px">Atualizar</button>
     <table id="tabela-usuarios">
-      <thead><tr><th>Login</th><th>Setor / acesso</th></tr></thead>
+      <thead><tr><th>Login</th><th>Setor / acesso</th><th>Situação</th><th>Ações</th></tr></thead>
       <tbody></tbody>
     </table>
+    <p id="msg-gestao-usuarios" class="msg"></p>
   </div>
 </section>
 
@@ -663,19 +667,85 @@ const carregarUnidadesUsuario = async () => {
     unidades.map(u => `<option value="${u.id}">${u.nome}</option>`).join("");
   sel.dataset.carregado = "1";
 };
+// Opções de setor para a troca de lotação (cache simples).
+let _opcoesUnidades = null;
+const opcoesUnidades = async () => {
+  if (_opcoesUnidades === null) {
+    const unidades = await consultar("/unidades");
+    _opcoesUnidades = unidades.map(
+      u => `<option value="${u.id}">${u.nome}</option>`).join("");
+  }
+  return _opcoesUnidades;
+};
+
+const gerirUsuario = async (caminho, dados, mensagem) => {
+  try {
+    await enviar(caminho, dados);
+    mostrar("msg-gestao-usuarios", mensagem, "ok");
+    carregarUsuarios();
+  } catch (e) { mostrar("msg-gestao-usuarios", e.message, "erro"); }
+};
+
 const carregarUsuarios = async () => {
   const corpo = document.querySelector("#tabela-usuarios tbody");
   try {
     const lista = await consultar("/usuarios");
-    corpo.innerHTML = lista.length ? "" : "<tr><td colspan=2>Nenhum usuário.</td></tr>";
+    corpo.innerHTML = lista.length ? "" : "<tr><td colspan=4>Nenhum usuário.</td></tr>";
+    const eu = localStorage.getItem("usuario");
     lista.forEach(u => {
       const tr = document.createElement("tr");
       const acesso = u.unidade
         || (u.perfil === "ADMIN" ? "Administrador (vê tudo)" : u.perfil);
-      tr.innerHTML = `<td>${u.login}</td><td>${acesso}</td>`;
+      if (!u.ativo) tr.style.opacity = "0.55";
+      tr.innerHTML = `<td>${u.login}${u.login === eu ? " <small>(você)</small>" : ""}</td>` +
+        `<td>${acesso}</td><td>${u.ativo ? "Ativo" : "Desativado"}</td><td></td>`;
+      const acoes = tr.lastChild;
+      const botao = (rotulo, fn, cor) => {
+        const b = document.createElement("button");
+        b.className = "acao"; b.textContent = rotulo;
+        b.style.marginRight = "6px"; b.style.marginBottom = "4px";
+        if (cor) b.style.background = cor;
+        b.addEventListener("click", fn);
+        acoes.appendChild(b);
+      };
+      botao("Nova senha", () => {
+        const senha = prompt(`Nova senha para ${u.login} (mínimo 8 caracteres):`);
+        if (senha === null) return;
+        gerirUsuario(`/usuarios/${u.id}`, {senha},
+                     `Senha de ${u.login} redefinida.`);
+      });
+      if (u.login !== eu) {  // não trocar o próprio setor nem se excluir
+        botao("Trocar setor", async () => {
+          const celula = acoes;
+          const antigo = celula.innerHTML;
+          celula.innerHTML =
+            `<select id="sel-un-${u.id}">${await opcoesUnidades()}</select> `;
+          const sel = celula.querySelector("select");
+          if (u.unidade_id) sel.value = u.unidade_id;
+          const ok = document.createElement("button");
+          ok.className = "acao"; ok.textContent = "Salvar";
+          ok.addEventListener("click", () => gerirUsuario(
+            `/usuarios/${u.id}`, {unidade_id: parseInt(sel.value, 10)},
+            `${u.login} movido de setor.`));
+          const cancelar = document.createElement("button");
+          cancelar.className = "acao"; cancelar.textContent = "Cancelar";
+          cancelar.style.background = "#666"; cancelar.style.marginLeft = "6px";
+          cancelar.addEventListener("click", () => { celula.innerHTML = antigo; carregarUsuarios(); });
+          celula.appendChild(ok); celula.appendChild(cancelar);
+        });
+        botao(u.ativo ? "Desativar" : "Reativar", () => gerirUsuario(
+          `/usuarios/${u.id}`, {ativo: u.ativo ? 0 : 1},
+          `${u.login} ${u.ativo ? "desativado" : "reativado"}.`), "#666");
+        botao("Excluir", () => {
+          if (!confirm(`Excluir DEFINITIVAMENTE o login ${u.login}? ` +
+                       "Para suspender sem apagar, use Desativar.")) return;
+          gerirUsuario(`/usuarios/${u.id}/exclusao`, {},
+                       `${u.login} excluído.`);
+        }, "#a33");
+      }
       corpo.appendChild(tr);
     });
-  } catch (e) { corpo.innerHTML = `<tr><td colspan=2>${e.message}</td></tr>`; }
+  } catch (e) { corpo.innerHTML = `<tr><td colspan=4>${e.message}</td></tr>`; }
 };
 document.getElementById("btn-recarregar-usuarios")
   .addEventListener("click", carregarUsuarios);

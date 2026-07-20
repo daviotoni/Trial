@@ -91,6 +91,80 @@ def autenticar(banco: sqlite3.Connection, login: str, senha: str) -> dict | None
     return {"login": login, "perfil": perfil, "unidade_id": unidade_id}
 
 
+def _carregar_usuario(banco, usuario_id):
+    linha = banco.execute(
+        "SELECT login, perfil, ativo FROM usuario WHERE id = ?",
+        (usuario_id,),
+    ).fetchone()
+    if linha is None:
+        raise ValueError("usuário inexistente")
+    return {"login": linha[0], "perfil": linha[1], "ativo": linha[2]}
+
+
+def _garantir_outro_admin_ativo(banco, usuario_id):
+    """Impede remover/desativar o último ADMIN ativo (trancaria o sistema)."""
+    (outros,) = banco.execute(
+        "SELECT COUNT(*) FROM usuario WHERE perfil = 'ADMIN' AND ativo = 1 "
+        "AND id <> ?", (usuario_id,),
+    ).fetchone()
+    if not outros:
+        raise ValueError("é o último administrador ativo — crie outro "
+                         "administrador antes de removê-lo ou desativá-lo")
+
+
+def atualizar_usuario(banco: sqlite3.Connection, usuario_id: int,
+                      unidade_id=..., senha: str | None = None,
+                      ativo=None) -> str:
+    """Edita o acesso de um usuário. Devolve o login afetado.
+
+    `unidade_id` muda a lotação (o setor determina o que o login acessa;
+    None remove a lotação — o perfil volta a valer). `senha` redefine a
+    senha. `ativo` (0/1) desativa/reativa o login. Desativar o último
+    ADMIN ativo é bloqueado.
+    """
+    alvo = _carregar_usuario(banco, usuario_id)
+    mudancas, valores = [], []
+    if unidade_id is not ...:
+        if unidade_id is not None and banco.execute(
+                "SELECT 1 FROM unidade WHERE id = ?", (unidade_id,)
+        ).fetchone() is None:
+            raise ValueError("setor (unidade) inexistente")
+        mudancas.append("unidade_id = ?")
+        valores.append(unidade_id)
+    if senha is not None:
+        if len(senha) < 8:
+            raise ValueError("senha deve ter ao menos 8 caracteres")
+        sal = secrets.token_bytes(16)
+        mudancas += ["senha_hash = ?", "sal = ?"]
+        valores += [_hash_senha(senha, sal), sal.hex()]
+    if ativo is not None:
+        if ativo not in (0, 1):
+            raise ValueError("ativo deve ser 0 ou 1")
+        if ativo == 0 and alvo["perfil"] == "ADMIN" and alvo["ativo"]:
+            _garantir_outro_admin_ativo(banco, usuario_id)
+        mudancas.append("ativo = ?")
+        valores.append(ativo)
+    if not mudancas:
+        raise ValueError("nada a alterar: informe unidade_id, senha "
+                         "e/ou ativo")
+    banco.execute(f"UPDATE usuario SET {', '.join(mudancas)} WHERE id = ?",
+                  (*valores, usuario_id))
+    return alvo["login"]
+
+
+def excluir_usuario(banco: sqlite3.Connection, usuario_id: int) -> str:
+    """Exclui um usuário definitivamente. Devolve o login excluído.
+
+    O último ADMIN ativo não pode ser excluído. Para afastamentos
+    temporários, prefira desativar (`atualizar_usuario(..., ativo=0)`).
+    """
+    alvo = _carregar_usuario(banco, usuario_id)
+    if alvo["perfil"] == "ADMIN" and alvo["ativo"]:
+        _garantir_outro_admin_ativo(banco, usuario_id)
+    banco.execute("DELETE FROM usuario WHERE id = ?", (usuario_id,))
+    return alvo["login"]
+
+
 def garantir_admin_inicial(banco: sqlite3.Connection) -> bool:
     """Cria o usuário 'admin' (senha inicial documentada) se não houver
     nenhum usuário cadastrado. Devolve True se criou."""
@@ -119,6 +193,12 @@ class Sessoes:
 
     def encerrar(self, token: str) -> None:
         self._ativas.pop(token, None)
+
+    def encerrar_do_login(self, login: str) -> None:
+        """Derruba todas as sessões de um login (acesso editado/excluído)."""
+        for token in [t for t, u in self._ativas.items()
+                      if u.get("login") == login]:
+            self._ativas.pop(token, None)
 
 
 def areas_do_usuario(banco: sqlite3.Connection, usuario: dict) -> set[str]:
