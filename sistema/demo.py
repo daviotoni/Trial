@@ -7,6 +7,7 @@ Uso:
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 
@@ -29,21 +30,44 @@ def criar_banco(caminho: str = ":memory:",
     from sistema import bancodados
 
     if bancodados.eh_url_postgres(caminho):
-        conexao = bancodados.ConexaoPostgres(caminho)
-        tem_schema = conexao.execute(
-            "SELECT to_regclass('public.unidade')").fetchone()[0]
-        if not tem_schema:
-            conexao.executescript(bancodados.schema_para_postgres(
-                (RAIZ / "schema.sql").read_text()))
-        # Seed em etapa própria: cobre banco cujo schema foi aplicado por
-        # fora (ex.: migração no Supabase) mas ainda sem dados.
-        vazio = conexao.execute(
-            "SELECT COUNT(*) FROM unidade").fetchone()[0] == 0
-        if vazio:
-            conexao.executescript(gerar())
-            conexao.executescript(bancodados.SETVAL_POS_SEED)
-        conexao.commit()
-        return conexao
+        try:
+            conexao = bancodados.ConexaoPostgres(caminho)
+            tem_schema = conexao.execute(
+                "SELECT to_regclass('public.unidade')").fetchone()[0]
+            if not tem_schema:
+                conexao.executescript(bancodados.schema_para_postgres(
+                    (RAIZ / "schema.sql").read_text()))
+            # Seed em etapa própria: cobre banco cujo schema foi aplicado por
+            # fora (ex.: migração no Supabase) mas ainda sem dados.
+            vazio = conexao.execute(
+                "SELECT COUNT(*) FROM unidade").fetchone()[0] == 0
+            if vazio:
+                conexao.executescript(gerar())
+                conexao.executescript(bancodados.SETVAL_POS_SEED)
+            conexao.commit()
+            return conexao
+        except Exception as erro:
+            # DATABASE_URL definida mas o Postgres não respondeu (senha
+            # errada, host da conexão direta — só IPv6 — em vez do pooler,
+            # porta incorreta, banco hibernado...). Em vez de derrubar o
+            # serviço inteiro (deploy falho, site fora do ar), o app segue
+            # de pé num SQLite efêmero e a rota /saude denuncia o problema
+            # (backend=sqlite, persistente=false). O log abaixo aparece no
+            # painel do Render para orientar a correção da URL.
+            print("=" * 70, flush=True)
+            print("ATENCAO: falha ao conectar no PostgreSQL da DATABASE_URL.",
+                  flush=True)
+            print(f"  Erro: {type(erro).__name__}: {erro}", flush=True)
+            print("  O app vai rodar em SQLite EFEMERO (dados NAO persistem).",
+                  flush=True)
+            print("  Verifique a DATABASE_URL: use o Session pooler do "
+                  "Supabase", flush=True)
+            print("  (porta 5432, host *.pooler.supabase.com) e a senha "
+                  "correta.", flush=True)
+            print("  Confira o backend em /saude apos o proximo deploy.",
+                  flush=True)
+            print("=" * 70, flush=True)
+            caminho = os.environ.get("CMDC_DB", "cmdc.db")
 
     conexao = sqlite3.connect(caminho, check_same_thread=not multithread)
     conexao.execute("PRAGMA foreign_keys = ON")
