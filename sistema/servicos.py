@@ -220,6 +220,64 @@ def desarquivar_processo(banco: sqlite3.Connection, processo_id: int) -> None:
                              "EM_TRAMITACAO")
 
 
+def excluir_processo(banco: sqlite3.Connection, processo_id: int,
+                     usuario: str, datahora: str) -> dict:
+    """Exclui um processo e tudo o que pende dele (ato privativo do admin).
+
+    Remove tramitações, documentos e as proposições vinculadas (com
+    pauta, votações, votos e pareceres); requerimentos derivados que
+    apontavam para uma proposição excluída perdem só o vínculo. Processo
+    ligado a uma contratação não é excluído (trate a contratação antes).
+    A exclusão fica registrada na trilha de auditoria.
+    """
+    linha = banco.execute(
+        "SELECT numero, ano, assunto FROM processo WHERE id = ?",
+        (processo_id,),
+    ).fetchone()
+    if linha is None:
+        raise RegraViolada("processo inexistente")
+    numero, ano, assunto = linha
+
+    if banco.execute(
+        "SELECT 1 FROM contratacao WHERE processo_id = ?", (processo_id,)
+    ).fetchone():
+        raise RegraViolada(
+            "o processo está vinculado a uma contratação — não pode ser "
+            "excluído")
+
+    proposicoes = [pid for (pid,) in banco.execute(
+        "SELECT id FROM proposicao WHERE processo_id = ?", (processo_id,))]
+    if proposicoes:
+        marcadores = ", ".join("?" * len(proposicoes))
+        banco.execute(
+            f"UPDATE proposicao SET proposicao_alvo_id = NULL "
+            f"WHERE proposicao_alvo_id IN ({marcadores})", proposicoes)
+        banco.execute(
+            f"DELETE FROM voto WHERE votacao_id IN "
+            f"(SELECT id FROM votacao WHERE proposicao_id IN ({marcadores}))",
+            proposicoes)
+        for tabela in ("votacao", "pauta_item", "parecer"):
+            banco.execute(
+                f"DELETE FROM {tabela} WHERE proposicao_id IN ({marcadores})",
+                proposicoes)
+        banco.execute(
+            f"DELETE FROM proposicao WHERE id IN ({marcadores})", proposicoes)
+
+    banco.execute("DELETE FROM tramitacao WHERE processo_id = ?",
+                  (processo_id,))
+    banco.execute("DELETE FROM documento WHERE processo_id = ?",
+                  (processo_id,))
+    banco.execute("DELETE FROM processo WHERE id = ?", (processo_id,))
+    banco.execute(
+        "INSERT INTO auditoria (tabela, registro_id, operacao, usuario, "
+        "datahora, detalhes) VALUES ('processo', ?, 'DELETE', ?, ?, ?)",
+        (processo_id, usuario, datahora,
+         f"Processo {numero}/{ano} — {assunto} "
+         f"({len(proposicoes)} proposição(ões) vinculada(s) excluída(s))"))
+    return {"numero": f"{numero}/{ano}",
+            "proposicoes_excluidas": len(proposicoes)}
+
+
 def tramitar(
     banco: sqlite3.Connection,
     processo_id: int,

@@ -1197,10 +1197,33 @@ const carregarProcesso = async () => {
     const trilha = processo.tramitacoes.map(t =>
       `<tr><td>${t.data}</td><td>${t.de}</td><td>${t.para}</td><td>${t.despacho || ""}</td></tr>`
     ).join("");
-    document.getElementById("detalhe-processo").innerHTML =
+    const detalhe = document.getElementById("detalhe-processo");
+    detalhe.innerHTML =
       `<p><strong>${processo.numero}</strong> — ${processo.assunto}<br>` +
       `Situação: ${processo.situacao} · Autuado em ${processo.data_autuacao}</p>` +
       (trilha ? `<table><thead><tr><th>Data</th><th>De</th><th>Para</th><th>Despacho</th></tr></thead><tbody>${trilha}</tbody></table>` : "<p>Sem tramitações.</p>");
+    // Exclusão definitiva: privativa do administrador (fica na auditoria).
+    if (localStorage.getItem("perfil") === "ADMIN") {
+      const b = document.createElement("button");
+      b.className = "acao"; b.style.background = "#a33";
+      b.style.marginTop = "8px";
+      b.textContent = "Excluir processo (admin)";
+      b.addEventListener("click", async () => {
+        if (!confirm(`Excluir DEFINITIVAMENTE o processo ${processo.numero}? ` +
+                     "Tramitações, documentos e proposições vinculadas serão " +
+                     "apagados. A exclusão fica registrada na auditoria.")) return;
+        try {
+          const r = await enviar(`/processos/${id}/exclusao`, {});
+          detalhe.innerHTML = "";
+          document.getElementById("form-tramitar").style.display = "none";
+          mostrar("msg-consulta", `Processo ${r.numero} excluído` +
+            (r.proposicoes_excluidas
+              ? ` (com ${r.proposicoes_excluidas} proposição(ões)).` : "."), "ok");
+          carregarCaixa(); carregarProposicoes();
+        } catch (e) { mostrar("msg-consulta", e.message, "erro"); }
+      });
+      detalhe.appendChild(b);
+    }
     document.getElementById("form-tramitar").style.display = "";
   } catch (erro) {
     document.getElementById("detalhe-processo").innerHTML = "";

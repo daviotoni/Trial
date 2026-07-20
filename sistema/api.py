@@ -582,6 +582,19 @@ class Aplicacao:
         self.banco.commit()
         return {"id": tramitacao_id}
 
+    def excluir_processo(self, processo_id: int):
+        # Ato privativo do administrador: apaga registros de vez (limpeza
+        # de autuações erradas/testes) e deixa rastro na auditoria.
+        if self.usuario_atual["perfil"] != "ADMIN":
+            raise AcessoNegado(
+                "a exclusão de processos é privativa do administrador")
+        from datetime import datetime
+        resumo = servicos.excluir_processo(
+            self.banco, processo_id, self.usuario_atual["login"],
+            datetime.now().isoformat(timespec="seconds"))
+        self.banco.commit()
+        return {"id": processo_id, "excluido": True, **resumo}
+
     def situacao_processo(self, processo_id: int, acao: str):
         {"arquivamento": servicos.arquivar_processo,
          "conclusao": servicos.concluir_processo,
@@ -848,6 +861,9 @@ ROTAS = [
     ("POST", r"^/processos/(\d+)/(arquivamento|conclusao|desarquivamento)$",
      "PROTOCOLO",
      lambda app, m, d: app.situacao_processo(int(m.group(1)), m.group(2))),
+    # Exclusão definitiva: rota logada ("*"), mas o handler exige ADMIN.
+    ("POST", r"^/processos/(\d+)/exclusao$", "*",
+     lambda app, m, d: app.excluir_processo(int(m.group(1)))),
     ("POST", r"^/folhas$", "FOLHA", lambda app, m, d: app.calcular_folha(d)),
     ("GET", r"^/folhas$", "FOLHA", lambda app, m, d: app.listar_folhas()),
     ("GET", r"^/folhas/(\d+)$", "FOLHA",
