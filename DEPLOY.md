@@ -58,6 +58,28 @@ atualizações. Passo a passo:
 4. No primeiro arranque o app cria o schema e a carga inicial no Supabase
    (bootstrap idempotente); nas próximas, só reutiliza.
 
+### Conferir se a persistência está ativa: rota `/saude`
+
+Abra **`https://SEU-APP.onrender.com/saude`** no navegador. A resposta diz
+qual banco a instância no ar está usando:
+
+- `{"backend": "postgres", "persistente": true, ...}` → **funcionando**: os
+  dados estão no Supabase e sobrevivem a reinícios. ✅
+- `{"backend": "sqlite", "persistente": false, ...}` → a `DATABASE_URL` **não
+  chegou** ao Postgres. Ou a variável não foi salva no Render, ou a URL está
+  incorreta e o app caiu no SQLite efêmero (veja os **Logs** do serviço no
+  Render — há um aviso explicando o erro).
+
+### Erro comum: conexão direta em vez do *pooler*
+
+O Supabase oferece dois endereços. A **conexão direta**
+(`db.<ref>.supabase.co`) é só IPv6 e o Render **não alcança** — use sempre o
+**Session pooler** (host `*.pooler.supabase.com`, porta 5432). Se a
+`DATABASE_URL` apontar para a direta, ou a senha estiver errada, o app agora
+**não cai** — ele sobe em SQLite efêmero e o `/saude` mostra
+`backend=sqlite`. Corrija a URL no Render (Environment) e salve; o serviço
+reinicia e o `/saude` deve passar a `postgres`.
+
 Notas: no plano gratuito do Supabase o banco hiberna após ~1 semana sem
 uso (reativa no painel). As sessões de login vivem em memória — após um
 reinício do app é preciso entrar de novo (os dados permanecem).
